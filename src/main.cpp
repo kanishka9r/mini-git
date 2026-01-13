@@ -1,16 +1,21 @@
 #include <iostream>
+#include "VCS.h"
 using namespace std;
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
-        cout << "No command provided\n";
+        cout << "Usage: vcs <command>\n";
         return 0;
     }
 
     string cmd = argv[1];
 
     if (cmd == "init") {
-        // will call VCS::init()
+        if (argc > 2) {
+        cout << "init does not take arguments\n";
+        return 0;
+    }
+        VCS::init();
     }
     else if (cmd == "add") {
         // will call VCS::add()
