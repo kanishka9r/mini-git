@@ -33,8 +33,11 @@ int main(int argc, char* argv[]) {
         // will call VCS::checkout()
     }
     else if (cmd == "log") {
-        // will call VCS::log()
-    }
+    if (argc == 3 && string(argv[2]) == "--graph")
+        VCS::logGraph();
+    else
+        VCS::log();
+}
     else if (cmd == "diff") {
         // will call Diff::run()
     }

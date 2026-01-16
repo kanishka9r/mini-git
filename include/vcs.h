@@ -11,4 +11,5 @@ public:
     static void branch(const string& name);
     static void checkout(const string& name);
     static void log();
+    static void logGraph();
 };

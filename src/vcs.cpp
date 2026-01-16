@@ -1,4 +1,6 @@
 #include <iostream>
+#include <fstream>
+#include <set>
 #include <direct.h>
 #include <sys/stat.h>
 #include <fstream>
