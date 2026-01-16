@@ -5,13 +5,17 @@
 
 using namespace std;
 
-// generate hash for content
-string computeHash(string content);
+class Storage
+{
+public:
+    // generate hash for content
+    static string computeHash(const string &content);
 
-// store object using hash
-void storeObject(string hash, string content);
+    // store object using hash
+    static void storeObject(const string &hash, const string &content);
 
-// retrieve stored object
-string getObject(string hash);
+    // retrieve stored object
+    static string getObject(const string &hash);
+};
 
 #endif
