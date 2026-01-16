@@ -19,8 +19,9 @@ string Storage::computeHash(const string &content)
 /*
 Store object only if not exists
 */
-void Storage::storeObject(const string &hash, const string &content)
+void Storage::storeObject(const string &content)
 {
+    string hash = computeHash(content);
     string path = ".vcs/objects/" + hash;
 
     struct stat st;

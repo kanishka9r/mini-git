@@ -1,4 +1,5 @@
 #include <iostream>
+#include "..\include\storage.h"
 #include "..\include\vcs.h"
 using namespace std;
 
@@ -17,9 +18,7 @@ int main(int argc, char* argv[]) {
             cout << "init does not take arguments\n";
             return 0;
         }
-
-        VCS vcs;
-        vcs.init();
+        VCS::init();
     }
     else if (cmd == "add") {
         // will call VCS::add()
@@ -42,6 +41,14 @@ int main(int argc, char* argv[]) {
     else if (cmd == "merge") {
         // will call Merge::run()
     }
+    else if (cmd == "cat-object") {
+    if (argc != 3) {
+        cout << "Usage: cat-object <hash>\n";
+        return 0;
+    }
+    cout << Storage::getObject(argv[2]) << endl;
+}
+
     else {
         cout << "Unknown command\n";
     }
