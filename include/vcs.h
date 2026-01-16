@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <unordered_map>
 
 using namespace std;
 
@@ -12,4 +13,5 @@ public:
     static void checkout(const string& name);
     static void log();
     static void logGraph();
+    static unordered_map<string, string> stagingArea;
 };
