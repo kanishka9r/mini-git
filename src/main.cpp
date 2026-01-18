@@ -20,11 +20,23 @@ int main(int argc, char* argv[]) {
         }
         VCS::init();
     }
-    else if (cmd == "add") {
-        // will call VCS::add()
+    else if (cmd == "add")
+    {
+        if (argc != 3)
+        {
+            cout << "Usage: vcs add <file>\n";
+            return 0;
+        }
+        VCS::add(argv[2]);
     }
-    else if (cmd == "commit") {
-        // will call VCS::commit()
+    else if (cmd == "commit")
+    {
+        if (argc != 3)
+        {
+            cout << "Usage: vcs commit <message>\n";
+            return 0;
+        }
+        VCS::commit(argv[2]);
     }
     else if (cmd == "branch") {
         // will call VCS::branch()
@@ -32,12 +44,12 @@ int main(int argc, char* argv[]) {
     else if (cmd == "checkout") {
         // will call VCS::checkout()
     }
-    else if (cmd == "log") {
-    if (argc == 3 && string(argv[2]) == "--graph")
-        VCS::logGraph();
-    else
-        VCS::log();
-}
+//     else if (cmd == "log") {
+//     if (argc == 3 && string(argv[2]) == "--graph")
+//         VCS::logGraph();
+//     else
+//         VCS::log();
+// }
     else if (cmd == "diff") {
         // will call Diff::run()
     }
