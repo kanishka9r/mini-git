@@ -128,3 +128,53 @@ void VCS::commit(const string& message)
 
     cout << "Committed as " << commitHash << endl;
 }
+string readHead() {
+    ifstream head(".vcs/refs/main");
+    string hash;
+    getline(head, hash);
+    return hash;
+}
+bool readCommit(
+    const string& hash,
+    string& parent,
+    string& message
+) {
+    ifstream file(".vcs/commits/" + hash);
+    if(!file) return false;
+
+    string dummy;
+    getline(file, dummy);  // commit hash line ignore
+    getline(file, parent);      // parent
+    string ts;
+    getline(file, ts);          // timestamp
+    getline(file, message);     // message
+
+    return true;
+}
+
+    void VCS::log(){
+    cout << "log not implemented yet" << endl;
+}
+
+void VCS::logGraph()
+{
+   string current = readHead();
+    set<string> visited; //infinite loop protection
+
+    while (current != "" && !visited.count(current)) {
+        visited.insert(current);
+
+        string parent, message;
+        if (!readCommit(current, parent, message))
+            break;
+
+        cout << "* " << current << " \"" << message << "\"\n";
+
+        if (parent != "")
+            cout << "|\n";
+
+        current = parent;
+    }
+}
+
+
