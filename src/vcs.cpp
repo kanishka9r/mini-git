@@ -28,6 +28,9 @@ void VCS::init()
     _mkdir(".vcs/commits");
     _mkdir(".vcs/refs");
 
+    ofstream indexFile(".vcs/index");
+    indexFile.close();
+
     ofstream headFile(".vcs/HEAD");
     headFile << "ref: refs/main";
     headFile.close();
@@ -53,6 +56,9 @@ void VCS::add(const string &filename)
     Storage::storeObject(content);
 
     stagingArea[filename] = hash;
+    ofstream index(".vcs/index", ios::app);
+    index << filename << ":" << hash << endl;
+    index.close();
 
     cout << "Added " + filename + " to staging" << endl;
 
@@ -60,6 +66,25 @@ void VCS::add(const string &filename)
 
 void VCS::commit(const string& message)
 {
+
+    ifstream index(".vcs/index");
+
+    string line;
+    stagingArea.clear();
+
+    while (getline(index, line))
+    {
+
+        int pos = line.find(":");
+
+        string filename = line.substr(0, pos);
+        string hash = line.substr(pos + 1);
+
+        stagingArea[filename] = hash;
+    }
+
+    index.close();
+
     if(stagingArea.empty()){
         cout << "Nothing to commit" << endl;
         return;
@@ -98,6 +123,8 @@ void VCS::commit(const string& message)
     refUpdate.close();
 
     stagingArea.clear();
+    ofstream clear(".vcs/index");
+    clear.close();
 
     cout << "Committed as " << commitHash << endl;
 }
