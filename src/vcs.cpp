@@ -5,8 +5,8 @@
 #include <sys/stat.h>
 #include <fstream>
 #include <time.h>
-#include "../include/vcs.h"
-#include "../include/storage.h"
+#include "vcs.h"
+#include "storage.h"
 
 using namespace std;
 

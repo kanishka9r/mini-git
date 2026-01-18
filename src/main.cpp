@@ -1,6 +1,6 @@
 #include <iostream>
-#include "..\include\storage.h"
-#include "..\include\vcs.h"
+#include "storage.h"
+#include "vcs.h"
 using namespace std;
 
 int main(int argc, char* argv[]) {
