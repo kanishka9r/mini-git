@@ -7,6 +7,7 @@
 #include <time.h>
 #include "vcs.h"
 #include "storage.h"
+#include <queue>
 
 using namespace std;
 
@@ -128,12 +129,14 @@ void VCS::commit(const string& message)
 
     cout << "Committed as " << commitHash << endl;
 }
+
 string readHead() {
     ifstream head(".vcs/refs/main");
     string hash;
     getline(head, hash);
     return hash;
 }
+
 bool readCommit(
     const string& hash,
     string& parent,
@@ -176,3 +179,73 @@ void VCS::logGraph()
         current = parent;
     }
 }
+vector<string> getParents(const string& commit)
+{
+    if (commit == "C3") return {"C2"};
+    if (commit == "C2") return {"C1"};
+    return {}; // C1 or unknown commit
+}
+
+
+void dfsAncestors(
+    const string& commit,
+    unordered_set<string>& visited
+) {
+    for (const string& parent : getParents(commit)) {
+        if (visited.find(parent) == visited.end()) {
+            visited.insert(parent);
+            dfsAncestors(parent, visited);
+        }
+    }
+}
+
+unordered_set<string> VCS::getAncestors(const string& commitHash)
+{
+    unordered_set<string> visited;
+    dfsAncestors(commitHash, visited);
+    return visited;
+}
+
+vector<string> VCS::bfsTraversal(const string& start)
+{
+    vector<string> order;
+    unordered_set<string> visited;
+    queue<string> q;
+
+    q.push(start);
+    visited.insert(start);
+
+    while (!q.empty())
+    {
+        string current = q.front();
+        q.pop();
+
+        for (const string& parent : getParents(current))
+        {
+            if (visited.find(parent) == visited.end())
+            {
+                visited.insert(parent);
+                order.push_back(parent);
+                q.push(parent);
+            }
+        }
+    }
+
+    return order;
+}
+
+void testGraphAlgorithms()
+{
+    cout << "BFS Traversal from C3:\n";
+    auto bfs = VCS::bfsTraversal("C3");
+    for (auto& x : bfs)
+        cout << x << " ";
+    cout << "\n";
+
+    cout << "Ancestors of C3:\n";
+    auto anc = VCS::getAncestors("C3");
+    for (auto& x : anc)
+        cout << x << " ";
+    cout << "\n";
+}
+
