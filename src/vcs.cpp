@@ -3,11 +3,11 @@
 #include <set>
 #include <direct.h>
 #include <sys/stat.h>
-#include <fstream>
 #include <time.h>
 #include "vcs.h"
 #include "storage.h"
 #include <queue>
+#include "commit.h"
 
 using namespace std;
 
@@ -42,18 +42,20 @@ void VCS::init()
 void VCS::add(const string &filename)
 {
     ifstream file(filename);
-    if(!file){
+    if (!file)
+    {
         cout << "File not found!" << endl;
         return;
     }
 
     string content, line;
-    while(getline(file, line)){
+    while (getline(file, line))
+    {
         content += line + "\n";
     }
 
     const string hash = Storage::computeHash(content);
-    
+
     Storage::storeObject(content);
 
     stagingArea[filename] = hash;
@@ -62,12 +64,10 @@ void VCS::add(const string &filename)
     index.close();
 
     cout << "Added " + filename + " to staging" << endl;
-
 }
 
-void VCS::commit(const string& message)
+void VCS::commit(const string &message)
 {
-
     ifstream index(".vcs/index");
 
     string line;
@@ -75,7 +75,6 @@ void VCS::commit(const string& message)
 
     while (getline(index, line))
     {
-
         int pos = line.find(":");
 
         string filename = line.substr(0, pos);
@@ -86,7 +85,8 @@ void VCS::commit(const string& message)
 
     index.close();
 
-    if(stagingArea.empty()){
+    if (stagingArea.empty())
+    {
         cout << "Nothing to commit" << endl;
         return;
     }
@@ -94,7 +94,8 @@ void VCS::commit(const string& message)
     string parentHash = "";
     ifstream refFile(".vcs/refs/main");
 
-    if(refFile){
+    if (refFile)
+    {
         getline(refFile, parentHash);
     }
 
@@ -113,7 +114,8 @@ void VCS::commit(const string& message)
     commitFile << now << endl;
     commitFile << message << endl;
 
-    for(auto it : stagingArea){
+    for (auto it : stagingArea)
+    {
         commitFile << it.first << ":" << it.second << endl;
     }
 
@@ -130,39 +132,39 @@ void VCS::commit(const string& message)
     cout << "Committed as " << commitHash << endl;
 }
 
-string readHead() {
+string readHead()
+{
     ifstream head(".vcs/refs/main");
     string hash;
     getline(head, hash);
     return hash;
 }
 
-bool readCommit(
-    const string& hash,
-    string& parent,
-    string& message
-) {
+bool readCommit(const string &hash, string &parent, string &message)
+{
     ifstream file(".vcs/commits/" + hash);
-    if(!file) return false;
+    if (!file)
+        return false;
 
     string dummy;
     getline(file, dummy);  // commit hash line ignore
-    getline(file, parent);      // parent
+    getline(file, parent); // parent
     string ts;
-    getline(file, ts);          // timestamp
-    getline(file, message);     // message
+    getline(file, ts);      // timestamp
+    getline(file, message); // message
 
     return true;
 }
 
-    void VCS::log(){
+void VCS::log()
+{
     cout << "log not implemented yet" << endl;
 }
 
 void VCS::logGraph()
 {
-   string current = readHead();
-    set<string> visited; //infinite loop protection
+    string current = readHead();
+    set<string> visited; // infinite loop protection
 
     while (current != "" && visited.find(current) == visited.end()) {
         visited.insert(current);
@@ -249,3 +251,61 @@ void testGraphAlgorithms()
     cout << "\n";
 }
 
+
+Commit VCS::getCommit(const string& hash){
+    string path = ".vcs/commits/" + hash;
+    ifstream commitFile(path);
+
+    if(!commitFile){
+        cout << "Commit not found!" << endl;
+    }
+
+    Commit c;
+    getline(commitFile, c.hash);
+    getline(commitFile, c.parentHash);
+
+    string temp_time;
+    getline(commitFile, temp_time);
+    c.timestamp = (time_t)stoll(temp_time);
+
+    getline(commitFile, c.message);
+
+    string line;
+    while(getline(commitFile, line)){
+        int pos = line.find(":");
+
+        string filename = line.substr(0, pos);
+        string hash = line.substr(pos + 1);
+        c.files[filename] = hash;
+
+    }
+    return c;
+}
+
+vector<string> VCS::getParents(const string& hash){
+    Commit c = getCommit(hash);
+
+    vector<string> parents; 
+    if(!c.parentHash.empty()){
+        parents.push_back(c.parentHash);
+    }
+    return parents;
+
+}
+
+string VCS::getHeadCommit(){
+    ifstream headFile(".vcs/HEAD");
+    string line;
+    getline(headFile, line);
+    headFile.close();
+
+    string refPath = line.substr(5);
+    string branchPath = ".vcs/" + refPath;
+
+    ifstream branchFile(branchPath);
+    string commitHash;
+    getline(branchFile, commitHash);
+    branchFile.close();
+
+    return commitHash;
+}

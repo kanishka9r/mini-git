@@ -1,6 +1,8 @@
 #pragma once
 #include <string>
 #include <unordered_map>
+#include <vector>
+#include <commit.h>
 #include <unordered_set>
 
 using namespace std;
@@ -17,4 +19,7 @@ public:
     static vector<string> bfsTraversal(const string& start);
     static unordered_set<string> getAncestors(const string& commitHash);
     static unordered_map<string, string> stagingArea;
+    static Commit getCommit(const string& hash);
+    static vector<string> getParents(const string& hash);
+    static string getHeadCommit();
 };
