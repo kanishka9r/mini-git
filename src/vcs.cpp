@@ -165,8 +165,7 @@ void VCS::logGraph()
     string current = readHead();
     set<string> visited; // infinite loop protection
 
-    while (current != "" && !visited.count(current))
-    {
+    while (current != "" && visited.find(current) == visited.end()) {
         visited.insert(current);
 
         string parent, message;

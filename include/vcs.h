@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <vector>
 #include <commit.h>
+#include <unordered_set>
 
 using namespace std;
 
@@ -15,6 +16,7 @@ public:
     static void checkout(const string& name);
     static void log();
     static void logGraph();
+    static unordered_set<string> getAncestors(const string& commitHash);
     static unordered_map<string, string> stagingArea;
     Commit getCommit(const string& hash);
     vector<string> getParents(const string& hash);
