@@ -251,13 +251,12 @@ void testGraphAlgorithms()
     cout << "\n";
 }
 
-
-Commit VCS::getCommit(const string& hash){
-    string path = ".vcs/commits/" + hash;
+Commit VCS::getCommit(const string& commitHash){
+    string path = ".vcs/commits/" + commitHash;
     ifstream commitFile(path);
 
     if(!commitFile){
-        cout << "Commit not found!" << endl;
+        throw runtime_error("Commit not found");
     }
 
     Commit c;
@@ -273,10 +272,11 @@ Commit VCS::getCommit(const string& hash){
     string line;
     while(getline(commitFile, line)){
         int pos = line.find(":");
+        if(pos == string::npos) continue;
 
         string filename = line.substr(0, pos);
-        string hash = line.substr(pos + 1);
-        c.files[filename] = hash;
+        string objectHash = line.substr(pos + 1);
+        c.files[filename] = objectHash;
 
     }
     return c;
@@ -308,4 +308,59 @@ string VCS::getHeadCommit(){
     branchFile.close();
 
     return commitHash;
+}
+
+void VCS::checkout(const string& name)
+{
+    struct stat st;
+
+    // Check repo exists
+    if (stat(".vcs", &st) != 0) {
+        cout << "Repository not initialized\n";
+        return;
+    }
+
+    // Check branch exists
+    string refPath = ".vcs/refs/" + name;
+    if (stat(refPath.c_str(), &st) != 0) {
+        cout << "Branch does not exist\n";
+        return;
+    }
+
+    // Update HEAD → branch
+    ofstream headFile(".vcs/HEAD");
+    headFile << "ref: refs/" << name;
+    headFile.close();
+
+    // 4️⃣ Read commit hash from branch
+    ifstream refFile(refPath);
+    string commitHash;
+    getline(refFile, commitHash);
+    refFile.close();
+
+    if (commitHash == "") {
+        cout << "Branch has no commits\n";
+        return;
+    }
+
+    // 5️⃣ Load commit snapshot (via API)
+    Commit commit;
+    if (!getCommit(commitHash)) {
+        cout << "Invalid commit\n";
+        return;
+    }
+
+    // 6️⃣ Restore files
+    for (auto& it : commit.files) {
+        const string& filename = it.first;
+        const string& hash = it.second;
+
+        string content = Storage::getObject(hash);
+
+        ofstream out(filename);
+        out << content;
+        out.close();
+    }
+
+    cout << "Switched to branch " << name << endl;
 }
