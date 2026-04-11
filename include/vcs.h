@@ -22,4 +22,7 @@ public:
     static Commit getCommit(const string& hash);
     static vector<string> getParents(const string& hash);
     static string getHeadCommit();
+    static string getCurrentBranch();
+    static void setCurrentBranch(const string& s);
+    static void updateBranch(const string& name, const string& hash);
 };

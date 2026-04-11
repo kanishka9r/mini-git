@@ -39,6 +39,13 @@ int main(int argc, char* argv[]) {
 
     else if (cmd == "branch") {
         // will call VCS::branch()
+        if (argc != 3)
+        {
+            cout << "Usage: vcs branch <name>\n";
+            return 0;
+        }
+
+        VCS::branch(argv[2]);
     }
 
     else if (cmd == "checkout") {

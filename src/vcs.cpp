@@ -33,7 +33,7 @@ void VCS::init()
     indexFile.close();
 
     ofstream headFile(".vcs/HEAD");
-    headFile << "ref: refs/main";
+    headFile << "main";
     headFile.close();
 
     cout << "Initialized empty VCS repository!" << endl;
@@ -163,7 +163,7 @@ void VCS::log()
 
 void VCS::logGraph()
 {
-    string current = readHead();
+    string current = getHeadCommit();
     set<string> visited; // infinite loop protection
 
     while (current != "" && visited.find(current) == visited.end()) {
@@ -295,11 +295,10 @@ vector<string> VCS::getParents(const string& hash){
 
 string VCS::getHeadCommit(){
     ifstream headFile(".vcs/HEAD");
-    string line;
-    getline(headFile, line);
+    string refPath;
+    getline(headFile, refPath);
     headFile.close();
 
-    string refPath = line.substr(5);
     string branchPath = ".vcs/" + refPath;
 
     ifstream branchFile(branchPath);
@@ -363,4 +362,55 @@ void VCS::checkout(const string& name)
     }
 
     cout << "Switched to branch " << name << endl;
+}
+
+
+string VCS::getCurrentBranch()
+{
+    ifstream f(".vcs/HEAD");
+    string branch;
+    getline(f, branch);
+    f.close();
+
+    return branch;
+}
+
+void VCS::setCurrentBranch(const string &s){
+    ofstream headFile(".vcs/HEAD");
+    headFile << s;
+    headFile.close();
+}
+
+void VCS::updateBranch(const string& name, const string& hash){
+    string path = ".vcs/refs/" + name;
+    ofstream branch(path);
+    branch << hash;
+    branch.close();
+}
+
+void VCS::branch(const string& name){
+    string path = ".vcs/refs/" + name;
+    struct stat st;
+
+    if (stat(path.c_str(), &st) == 0)
+    {
+        cout << "Branch already exists" << endl;
+        return;
+    }
+    string currentBranch;
+    ifstream headFile(".vcs/HEAD");
+    getline(headFile, currentBranch);
+    headFile.close();
+
+    string commitHash;
+    ifstream f(".vcs/refs/" + currentBranch);
+    getline(f, commitHash);
+    f.close();
+
+    ofstream newBranch(path);
+    newBranch << commitHash;
+    newBranch.close();
+
+    cout << "Created branch " << name << endl;
+
 }
