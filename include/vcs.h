@@ -16,13 +16,4 @@ public:
     static void checkout(const string& name);
     static void log();
     static void logGraph();
-    static vector<string> bfsTraversal(const string& start);
-    static unordered_set<string> getAncestors(const string& commitHash);
-    static unordered_map<string, string> stagingArea;
-    static Commit getCommit(const string& hash);
-    static vector<string> getParents(const string& hash);
-    static string getHeadCommit();
-    static string getCurrentBranch();
-    static void setCurrentBranch(const string& s);
-    static void updateBranch(const string& name, const string& hash);
 };

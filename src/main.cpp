@@ -11,8 +11,8 @@ int main(int argc, char* argv[]) {
 
     string cmd = argv[1];
 
+    // will call VCS::init()
     if (cmd == "init") {
-        // will call VCS::init()
         if (argc > 2)
         {
             cout << "init does not take arguments\n";
@@ -21,24 +21,26 @@ int main(int argc, char* argv[]) {
         VCS::init();
     }
 
+    // will call VCS::add()
     else if (cmd == "add") {
         if (argc != 3) {
-        cout << "Usage: vcs add <file>\n";
-        return 0;
-    }
-    VCS::add(argv[2]);
+            cout << "Usage: vcs add <file>\n";
+            return 0;
+        }
+        VCS::add(argv[2]);
     }
 
+    // will call VCS::commit
     else if (cmd == "commit") {
         if (argc != 3) {
-        cout << "Usage: vcs commit <message>\n";
-        return 0;
-    }
-    VCS::commit(argv[2]);
+            cout << "Usage: vcs commit <message>\n";
+            return 0;
+        }
+        VCS::commit(argv[2]);
     }
 
+    // will call VCS::branch()
     else if (cmd == "branch") {
-        // will call VCS::branch()
         if (argc != 3)
         {
             cout << "Usage: vcs branch <name>\n";

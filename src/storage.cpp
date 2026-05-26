@@ -1,5 +1,6 @@
 #include "storage.h"
 #include <fstream>
+#include <unordered_map>
 #include <sys/stat.h>
 
 using namespace std;
@@ -16,9 +17,7 @@ string Storage::computeHash(const string &content)
      return to_string(h);
 }
 
-/*
-Store object only if not exists
-*/
+// Store object only if not exists
 void Storage::storeObject(const string &content)
 {
     string hash = computeHash(content);
@@ -37,9 +36,7 @@ void Storage::storeObject(const string &content)
     file.close();
 }
 
-/*
-Retrieve object by hash
-*/
+// Retrieve object by hash
 string Storage::getObject(const string &hash)
 {
     string path = ".vcs/objects/" + hash;
@@ -54,4 +51,32 @@ string Storage::getObject(const string &hash)
 
     file.close();
     return content;
+}
+
+
+// Read the index and return the staging area map
+unordered_map<string, string> Storage::readIndex()
+{
+    unordered_map<string, string> stagingArea;
+
+    ifstream index(".vcs/index");
+    string line;
+
+    while (getline(index, line))
+    {
+        int pos = line.find(":");
+
+        string filename = line.substr(0, pos);
+        string hash = line.substr(pos + 1);
+
+        stagingArea[filename] = hash;
+    }
+
+    return stagingArea;
+}
+
+// Clears the index file
+void Storage::clearIndex()
+{
+    ofstream clear(".vcs/index");
 }

@@ -1,7 +1,7 @@
-#ifndef STORAGE_H
-#define STORAGE_H
+#pragma once
 
 #include <string>
+#include <unordered_map>
 
 using namespace std;
 
@@ -16,6 +16,9 @@ public:
 
     // retrieve stored object
     static string getObject(const string &hash);
+
+    static unordered_map<string, string> readIndex();
+
+    static void clearIndex();
 };
 
-#endif

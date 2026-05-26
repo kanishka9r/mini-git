@@ -6,12 +6,13 @@
 #include <time.h>
 #include "vcs.h"
 #include "storage.h"
-#include <queue>
 #include "commit.h"
+#include "branch.h"
+#include "graph.h"
+#include <queue>
 
 using namespace std;
 
-unordered_map<string, string> VCS::stagingArea;
 
 void VCS::init()
 {
@@ -41,6 +42,14 @@ void VCS::init()
 
 void VCS::add(const string &filename)
 {
+    // Repo check
+    struct stat st;
+    if (stat(".vcs", &st) != 0)
+    {
+        cout << "Repository not initialized!" << endl;
+        return;
+    }
+
     ifstream file(filename);
     if (!file)
     {
@@ -48,19 +57,29 @@ void VCS::add(const string &filename)
         return;
     }
 
+    //! changed the content input logic
     string content, line;
-    while (getline(file, line))
-    {
-        content += line + "\n";
-    }
+    string content((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
 
     const string hash = Storage::computeHash(content);
 
+    //? maybe we can pass the hash calculated above
     Storage::storeObject(content);
 
+    //! changed the logic
+    //* now we read the index file again and then append the new file
+    //* to avoid duplication
+    auto stagingArea = Storage::readIndex();
+
     stagingArea[filename] = hash;
-    ofstream index(".vcs/index", ios::app);
-    index << filename << ":" << hash << endl;
+
+    ofstream index(".vcs/index", ios::trunc);
+
+    for (auto &p : stagingArea)
+    {
+        index << p.first << ":" << p.second << endl;
+    }
+
     index.close();
 
     cout << "Added " + filename + " to staging" << endl;
@@ -68,22 +87,15 @@ void VCS::add(const string &filename)
 
 void VCS::commit(const string &message)
 {
-    ifstream index(".vcs/index");
-
-    string line;
-    stagingArea.clear();
-
-    while (getline(index, line))
+    // Repo check
+    struct stat st;
+    if (stat(".vcs", &st) != 0)
     {
-        int pos = line.find(":");
-
-        string filename = line.substr(0, pos);
-        string hash = line.substr(pos + 1);
-
-        stagingArea[filename] = hash;
+        cout << "Repository not initialized!" << endl;
+        return;
     }
 
-    index.close();
+    auto stagingArea = Storage::readIndex();
 
     if (stagingArea.empty())
     {
@@ -91,69 +103,29 @@ void VCS::commit(const string &message)
         return;
     }
 
-    string parentHash = "";
-    ifstream refFile(".vcs/refs/main");
-
-    if (refFile)
-    {
-        getline(refFile, parentHash);
-    }
-
-    refFile.close();
+    // from branch.cpp
+    //! fixed the hardcoded main branch
+    string currentBranch = Branch::getCurrentBranch();
+    string parentHash = Branch::getHead(currentBranch);
 
     time_t now = time(0);
 
     string raw = message + parentHash + to_string(now);
-    string commitHash = Storage::computeHash(raw);
-
-    string path = ".vcs/commits/" + commitHash;
-    ofstream commitFile(path);
-
-    commitFile << commitHash << endl;
-    commitFile << parentHash << endl;
-    commitFile << now << endl;
-    commitFile << message << endl;
-
-    for (auto it : stagingArea)
+    //! changed the hashing method
+    for (auto &p : stagingArea)
     {
-        commitFile << it.first << ":" << it.second << endl;
+        raw += p.first + p.second;
     }
 
-    commitFile.close();
+    string commitHash = Storage::computeHash(raw);
 
-    ofstream refUpdate(".vcs/refs/main");
-    refUpdate << commitHash;
-    refUpdate.close();
+    Commit::saveCommitRaw(commitHash, parentHash, now, message, stagingArea);
 
-    stagingArea.clear();
-    ofstream clear(".vcs/index");
-    clear.close();
+    Branch::updateHead(currentBranch, commitHash);
+
+    Storage::clearIndex();
 
     cout << "Committed as " << commitHash << endl;
-}
-
-string readHead()
-{
-    ifstream head(".vcs/refs/main");
-    string hash;
-    getline(head, hash);
-    return hash;
-}
-
-bool readCommit(const string &hash, string &parent, string &message)
-{
-    ifstream file(".vcs/commits/" + hash);
-    if (!file)
-        return false;
-
-    string dummy;
-    getline(file, dummy);  // commit hash line ignore
-    getline(file, parent); // parent
-    string ts;
-    getline(file, ts);      // timestamp
-    getline(file, message); // message
-
-    return true;
 }
 
 void VCS::log()
@@ -163,165 +135,38 @@ void VCS::log()
 
 void VCS::logGraph()
 {
-    string current = getHeadCommit();
+    string current = Branch::getHeadCommit();
     set<string> visited; // infinite loop protection
 
     while (current != "" && visited.find(current) == visited.end()) {
         visited.insert(current);
 
-        string parent, message;
-        if (!readCommit(current, parent, message))
-            break;
+        Commit c = Commit::getCommit(current);
 
-        cout << "* " << current << " \"" << message << "\"\n";
+        cout << "* " << current << " \"" << c.message << "\"\n";
 
-        if (parent != "")
+        if (!c.parentHash.empty())
             cout << "|\n";
 
-        current = parent;
-    }
-}
-vector<string> getParents(const string& commit)
-{
-    if (commit == "C3") return {"C2"};
-    if (commit == "C2") return {"C1"};
-    return {}; // C1 or unknown commit
-}
-
-
-void dfsAncestors(
-    const string& commit,
-    unordered_set<string>& visited
-) {
-    for (const string& parent : getParents(commit)) {
-        if (visited.find(parent) == visited.end()) {
-            visited.insert(parent);
-            dfsAncestors(parent, visited);
-        }
+        current = c.parentHash;
     }
 }
 
-unordered_set<string> VCS::getAncestors(const string& commitHash)
-{
-    unordered_set<string> visited;
-    dfsAncestors(commitHash, visited);
-    return visited;
-}
-
-vector<string> VCS::bfsTraversal(const string& start)
-{
-    vector<string> order;
-    unordered_set<string> visited;
-    queue<string> q;
-
-    q.push(start);
-    visited.insert(start);
-
-    while (!q.empty())
-    {
-        string current = q.front();
-        q.pop();
-
-        for (const string& parent : getParents(current))
-        {
-            if (visited.find(parent) == visited.end())
-            {
-                visited.insert(parent);
-                order.push_back(parent);
-                q.push(parent);
-            }
-        }
-    }
-
-    return order;
-}
-
-void testGraphAlgorithms()
-{
-    cout << "BFS Traversal from C3:\n";
-    auto bfs = VCS::bfsTraversal("C3");
-    for (auto& x : bfs)
-        cout << x << " ";
-    cout << "\n";
-
-    cout << "Ancestors of C3:\n";
-    auto anc = VCS::getAncestors("C3");
-    for (auto& x : anc)
-        cout << x << " ";
-    cout << "\n";
-}
-
-Commit VCS::getCommit(const string& commitHash){
-    string path = ".vcs/commits/" + commitHash;
-    ifstream commitFile(path);
-
-    if(!commitFile){
-        throw runtime_error("Commit not found");
-    }
-
-    Commit c;
-    getline(commitFile, c.hash);
-    getline(commitFile, c.parentHash);
-
-    string temp_time;
-    getline(commitFile, temp_time);
-    c.timestamp = (time_t)stoll(temp_time);
-
-    getline(commitFile, c.message);
-
-    string line;
-    while(getline(commitFile, line)){
-        int pos = line.find(":");
-        if(pos == string::npos) continue;
-
-        string filename = line.substr(0, pos);
-        string objectHash = line.substr(pos + 1);
-        c.files[filename] = objectHash;
-
-    }
-    return c;
-}
-
-vector<string> VCS::getParents(const string& hash){
-    Commit c = getCommit(hash);
-
-    vector<string> parents; 
-    if(!c.parentHash.empty()){
-        parents.push_back(c.parentHash);
-    }
-    return parents;
-
-}
-
-string VCS::getHeadCommit(){
-    ifstream headFile(".vcs/HEAD");
-    string refPath;
-    getline(headFile, refPath);
-    headFile.close();
-
-    string branchPath = ".vcs/" + refPath;
-
-    ifstream branchFile(branchPath);
-    string commitHash;
-    getline(branchFile, commitHash);
-    branchFile.close();
-
-    return commitHash;
-}
-
-void VCS::checkout(const string& name)
+void VCS::checkout(const string &name)
 {
     struct stat st;
 
     // Check repo exists
-    if (stat(".vcs", &st) != 0) {
+    if (stat(".vcs", &st) != 0)
+    {
         cout << "Repository not initialized\n";
         return;
     }
 
     // Check branch exists
     string refPath = ".vcs/refs/" + name;
-    if (stat(refPath.c_str(), &st) != 0) {
+    if (stat(refPath.c_str(), &st) != 0)
+    {
         cout << "Branch does not exist\n";
         return;
     }
@@ -337,22 +182,20 @@ void VCS::checkout(const string& name)
     getline(refFile, commitHash);
     refFile.close();
 
-    if (commitHash == "") {
+    if (commitHash == "")
+    {
         cout << "Branch has no commits\n";
         return;
     }
 
     // 5️⃣ Load commit snapshot (via API)
-    Commit commit;
-    if (!getCommit(commitHash)) {
-        cout << "Invalid commit\n";
-        return;
-    }
+    Commit commit = Commit::getCommit(commitHash);
 
     // 6️⃣ Restore files
-    for (auto& it : commit.files) {
-        const string& filename = it.first;
-        const string& hash = it.second;
+    for (auto &it : commit.files)
+    {
+        const string &filename = it.first;
+        const string &hash = it.second;
 
         string content = Storage::getObject(hash);
 
@@ -362,55 +205,4 @@ void VCS::checkout(const string& name)
     }
 
     cout << "Switched to branch " << name << endl;
-}
-
-
-string VCS::getCurrentBranch()
-{
-    ifstream f(".vcs/HEAD");
-    string branch;
-    getline(f, branch);
-    f.close();
-
-    return branch;
-}
-
-void VCS::setCurrentBranch(const string &s){
-    ofstream headFile(".vcs/HEAD");
-    headFile << s;
-    headFile.close();
-}
-
-void VCS::updateBranch(const string& name, const string& hash){
-    string path = ".vcs/refs/" + name;
-    ofstream branch(path);
-    branch << hash;
-    branch.close();
-}
-
-void VCS::branch(const string& name){
-    string path = ".vcs/refs/" + name;
-    struct stat st;
-
-    if (stat(path.c_str(), &st) == 0)
-    {
-        cout << "Branch already exists" << endl;
-        return;
-    }
-    string currentBranch;
-    ifstream headFile(".vcs/HEAD");
-    getline(headFile, currentBranch);
-    headFile.close();
-
-    string commitHash;
-    ifstream f(".vcs/refs/" + currentBranch);
-    getline(f, commitHash);
-    f.close();
-
-    ofstream newBranch(path);
-    newBranch << commitHash;
-    newBranch.close();
-
-    cout << "Created branch " << name << endl;
-
 }
