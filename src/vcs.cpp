@@ -57,8 +57,6 @@ void VCS::add(const string &filename)
         return;
     }
 
-    //! changed the content input logic
-    string content, line;
     string content((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
 
     const string hash = Storage::computeHash(content);
@@ -173,7 +171,7 @@ void VCS::checkout(const string &name)
 
     // Update HEAD → branch
     ofstream headFile(".vcs/HEAD");
-    headFile << "ref: refs/" << name;
+    headFile << name;
     headFile.close();
 
     // 4️⃣ Read commit hash from branch
@@ -205,4 +203,8 @@ void VCS::checkout(const string &name)
     }
 
     cout << "Switched to branch " << name << endl;
+}
+
+void VCS::branch(const string& name){
+    Branch::createBranch(name);
 }

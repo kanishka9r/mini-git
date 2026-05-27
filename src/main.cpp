@@ -51,7 +51,11 @@ int main(int argc, char* argv[]) {
     }
 
     else if (cmd == "checkout") {
-        // will call VCS::checkout()
+        if (argc != 3) {
+        cout << "Usage: vcs checkout <name>\n";
+        return 0;
+        }
+        VCS::checkout(argv[2]);
     }
 
     else if (cmd == "log") {

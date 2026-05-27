@@ -36,11 +36,11 @@ void Branch::createBranch(const string& name){
 string Branch::getHeadCommit()
 {
     ifstream headFile(".vcs/HEAD");
-    string refPath;
-    getline(headFile, refPath);
+    string branchName;
+    getline(headFile, branchName);
     headFile.close();
 
-    string branchPath = ".vcs/" + refPath;
+    string branchPath = ".vcs/refs/" + branchName;
 
     ifstream branchFile(branchPath);
     string commitHash;
@@ -60,10 +60,10 @@ string Branch::getCurrentBranch()
     return branch;
 }
 
-void Branch::setCurrentBranch(const string &s)
+void Branch::setCurrentBranch(const string &name)
 {
     ofstream headFile(".vcs/HEAD");
-    headFile << s;
+    headFile << name;
     headFile.close();
 }
 
