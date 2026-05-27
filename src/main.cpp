@@ -1,6 +1,10 @@
 #include <iostream>
 #include "storage.h"
 #include "vcs.h"
+#include "diff.h"
+#include "branch.h"
+#include "commit.h"
+#include "merge.h"
 using namespace std;
 
 int main(int argc, char* argv[]) {
@@ -46,37 +50,48 @@ int main(int argc, char* argv[]) {
             cout << "Usage: vcs branch <name>\n";
             return 0;
         }
-
         VCS::branch(argv[2]);
     }
 
+    // will call VCS::checkout
     else if (cmd == "checkout") {
-        // will call VCS::checkout()
+        if (argc != 3) {
+        cout << "Usage: vcs checkout <branch>\n";
+        return 0;
+    }
+    VCS::checkout(argv[2]);
     }
 
+    // will call VCS::log
     else if (cmd == "log") {
     if (argc == 3 && string(argv[2]) == "--graph")
         VCS::logGraph();
     else
         VCS::log();
-}
-
+}  
+ 
+    // will call Diff::run()
     else if (cmd == "diff") {
-        // will call Diff::run()
+         if (argc != 4) {
+        cout << "Usage: vcs diff <file1> <file2>\n";
+        return 0;
+    }
+    Diff::run(argv[2], argv[3]);
     }
     
     else if (cmd == "merge") {
         // will call Merge::run()
     }
 
+    // will call Storage::getObject
     else if (cmd == "cat-object") {
     if (argc != 3) {
         cout << "Usage: cat-object <hash>\n";
         return 0;
     }
     cout << Storage::getObject(argv[2]) << endl;
-}
-
+    }
+    
     else {
         cout << "Unknown command\n";
     }

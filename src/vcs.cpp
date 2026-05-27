@@ -130,7 +130,29 @@ void VCS::commit(const string &message)
 
 void VCS::log()
 {
-    cout << "log not implemented yet" << endl;
+    string current = Branch::getHeadCommit();
+
+   if (current.empty()) {
+        cout << "No commits yet\n";
+        return;
+    }
+
+    set<string> visited;
+
+    while (!current.empty() &&
+        visited.find(current) == visited.end())
+    {
+        visited.insert(current);
+
+        Commit c = Commit::getCommit(current);
+
+        cout << "commit " << c.hash << endl;
+        cout << "Date: " << c.timestamp << endl;
+        cout << "Message: " << c.message << endl;
+        cout << endl;
+
+        current = c.parentHash;
+    }
 }
 
 void VCS::logGraph()
@@ -176,7 +198,7 @@ void VCS::checkout(const string &name)
     headFile << "ref: refs/" << name;
     headFile.close();
 
-    // 4️⃣ Read commit hash from branch
+    //  Read commit hash from branch
     ifstream refFile(refPath);
     string commitHash;
     getline(refFile, commitHash);
@@ -188,10 +210,10 @@ void VCS::checkout(const string &name)
         return;
     }
 
-    // 5️⃣ Load commit snapshot (via API)
+    // Load commit snapshot (via API)
     Commit commit = Commit::getCommit(commitHash);
 
-    // 6️⃣ Restore files
+    // Restore files
     for (auto &it : commit.files)
     {
         const string &filename = it.first;
