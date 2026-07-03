@@ -7,6 +7,13 @@
 
 using namespace std;
 
+struct FileChange {
+    string filename;
+    string status;  // "modified", "added", "deleted"
+    string oldHash;
+    string newHash;
+};
+
 class VCS {
 public:
     static void init();
@@ -16,4 +23,10 @@ public:
     static void checkout(const string& name);
     static void log();
     static void logGraph();
+
+    static string commitAndReturnHash(const string& message);
+    static vector<Commit> getCommitHistory();
+    static vector<FileChange> getModifiedFiles();
+    static bool isInitialized();
+    static void addMultiple(const vector<string>& filenames);
 };

@@ -10,8 +10,10 @@
 #include "branch.h"
 #include "graph.h"
 #include <queue>
+#include <filesystem>
 
 using namespace std;
+namespace fs = std::filesystem;
 
 
 void VCS::init()
@@ -229,4 +231,141 @@ void VCS::checkout(const string &name)
 
 void VCS::branch(const string& name){
     Branch::createBranch(name);
+}
+
+//gui based code
+
+bool VCS::isInitialized() {
+    struct stat st;
+    return stat(".vcs", &st) == 0;
+}
+
+string VCS::commitAndReturnHash(const string& message) {
+    if (!isInitialized()) return "";
+
+    auto stagingArea = Storage::readIndex();
+    if (stagingArea.empty()) return "";
+
+    string currentBranch = Branch::getCurrentBranch();
+    string parentHash = Branch::getHead(currentBranch);
+    time_t now = time(0);
+
+    string raw = message + parentHash + to_string(now);
+    for (auto &p : stagingArea) {
+        raw += p.first + p.second;
+    }
+
+    string commitHash = Storage::computeHash(raw);
+    Commit::saveCommitRaw(commitHash, parentHash, now, message, stagingArea);
+    Branch::updateHead(currentBranch, commitHash);
+    Storage::clearIndex();
+
+    return commitHash;
+}
+
+vector<Commit> VCS::getCommitHistory() {
+    vector<Commit> history;
+    if (!isInitialized()) return history;
+
+    string current = Branch::getHeadCommit();
+    set<string> visited;
+
+    while (!current.empty() && visited.find(current) == visited.end()) {
+        visited.insert(current);
+        Commit c = Commit::getCommit(current);
+        history.push_back(c);
+        current = c.parentHash;
+    }
+
+    return history;
+}
+
+void VCS::addMultiple(const vector<string>& filenames) {
+    if (!isInitialized()) return;
+    
+    auto stagingArea = Storage::readIndex();
+    
+    for (const string& filename : filenames) {
+        ifstream file(filename);
+        if (!file) continue;
+        
+        string content((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
+        string hash = Storage::computeHash(content);
+        Storage::storeObject(content);
+        
+        stagingArea[filename] = hash;
+    }
+    
+    ofstream index(".vcs/index", ios::trunc);
+    for (auto &p : stagingArea) {
+        index << p.first << ":" << p.second << endl;
+    }
+    index.close();
+}
+
+vector<FileChange> VCS::getModifiedFiles() {
+    vector<FileChange> changes;
+    if (!isInitialized()) return changes;
+
+    string current = Branch::getHeadCommit();
+    unordered_map<string, string> headFiles;
+    if (!current.empty()) {
+        Commit headCommit = Commit::getCommit(current);
+        headFiles = headCommit.files;
+    }
+
+    try {
+        for (auto it = fs::recursive_directory_iterator("."); it != fs::recursive_directory_iterator(); ++it) {
+            if (it->is_directory()) {
+                string name = it->path().filename().string();
+                if (name == ".vcs" || name == ".git" || name == "frontend" || name == "build" || name == "node_modules") {
+                    it.disable_recursion_pending();
+                    continue;
+                }
+            } else if (it->is_regular_file()) {
+                string path = it->path().string();
+                if (path.length() >= 2 && path[0] == '.' && (path[1] == '\\' || path[1] == '/')) {
+                    path = path.substr(2);
+                }
+                for (char& c : path) { if (c == '\\') c = '/'; }
+
+                ifstream file(path);
+                if (file) {
+                    string content((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
+                    string hash = Storage::computeHash(content);
+                    
+                    if (headFiles.find(path) == headFiles.end()) {
+                        FileChange change;
+                        change.filename = path;
+                        change.status = "added";
+                        change.oldHash = "";
+                        change.newHash = hash;
+                        changes.push_back(change);
+                    } else if (headFiles[path] != hash) {
+                        FileChange change;
+                        change.filename = path;
+                        change.status = "modified";
+                        change.oldHash = headFiles[path];
+                        change.newHash = hash;
+                        changes.push_back(change);
+                    }
+                    
+                    headFiles.erase(path);
+                }
+            }
+        }
+    } catch (const fs::filesystem_error& e) {
+        cout << "Filesystem error: " << e.what() << endl;
+    }
+
+    for (auto& p : headFiles) {
+        FileChange change;
+        change.filename = p.first;
+        change.status = "deleted";
+        change.oldHash = p.second;
+        change.newHash = "";
+        changes.push_back(change);
+    }
+    
+    return changes;
 }
