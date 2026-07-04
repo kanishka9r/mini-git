@@ -5,11 +5,27 @@
 #include "branch.h"
 #include "commit.h"
 #include "merge.h"
+#include "api_server.h"
 using namespace std;
 
 int main(int argc, char* argv[]) {
+
+    //Server Mode: "serve" argument  start REST API 
+    if (argc >= 2 && string(argv[1]) == "serve") {
+        int port = 8080;
+        if (argc >= 3) {
+            port = atoi(argv[2]);
+            if (port <= 0) port = 8080;
+        }
+        ApiServer::start(port);
+        return 0;
+    }
+
     if (argc < 2) {
-        cout << "No command provided\n";
+        cout << "Starting Mini-Git...\n";
+        cout << "Open http://localhost:5173 in your browser (React dev server)\n";
+        cout << "Or http://localhost:8080 for the API server\n";
+        ApiServer::start(8080);
         return 0;
     }
 
