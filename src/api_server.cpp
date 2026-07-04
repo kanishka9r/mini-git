@@ -204,13 +204,13 @@ static vector<string> parseJsonStringArray(const string &arr)
     return result;
 }
 
-// --- API Server Implementation -------------------------------------
+// API Server Implementation
 
 void ApiServer::start(int port)
 {
     httplib::Server svr;
 
-    // --- CORS middleware -------------------------------------------
+    // CORS middleware
     svr.set_pre_routing_handler([](const httplib::Request&, httplib::Response& res) {
         res.set_header("Access-Control-Allow-Origin", "*");
         res.set_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
@@ -226,7 +226,7 @@ void ApiServer::start(int port)
         res.status = 204;
     });
 
-    // --- POST /api/workspace ---------------------------------------
+    // POST /api/workspace 
     svr.Post("/api/workspace", [](const httplib::Request& req, httplib::Response& res) {
         auto params = parseJson(req.body);
 
@@ -261,7 +261,7 @@ void ApiServer::start(int port)
         }
     });
 
-    // --- GET /api/status -------------------------------------------
+    // GET /api/status 
     svr.Get("/api/status", [](const httplib::Request&, httplib::Response& res) {
         bool init = VCS::isInitialized();
         string branch = init ? Branch::getCurrentBranch() : "";
@@ -276,7 +276,7 @@ void ApiServer::start(int port)
         res.set_content(json, "application/json");
     });
 
-    // --- POST /api/init --------------------------------------------
+    //  POST /api/init 
     svr.Post("/api/init", [](const httplib::Request&, httplib::Response& res) {
         if (VCS::isInitialized())
         {
@@ -288,7 +288,7 @@ void ApiServer::start(int port)
         res.set_content("{\"success\":true,\"message\":\"Initialized empty VCS repository!\"}", "application/json");
     });
 
-    // --- POST /api/add ----------------------------------------------
+    // POST /api/add 
     svr.Post("/api/add", [](const httplib::Request& req, httplib::Response& res) {
         auto params = parseJson(req.body);
 
@@ -313,7 +313,7 @@ void ApiServer::start(int port)
         res.set_content("{\"success\":true,\"staged\":" + to_string(files.size()) + "}", "application/json");
     });
 
-    // --- POST /api/commit -------------------------------------------
+    // POST /api/commit 
     svr.Post("/api/commit", [](const httplib::Request& req, httplib::Response& res) {
         auto params = parseJson(req.body);
 
@@ -335,7 +335,7 @@ void ApiServer::start(int port)
         res.set_content("{\"success\":true,\"hash\":\"" + jsonEscape(hash) + "\"}", "application/json");
     });
 
-    // --- GET /api/log ------------------------------------------------
+    // GET /api/log 
     svr.Get("/api/log", [](const httplib::Request&, httplib::Response& res) {
         vector<Commit> history = VCS::getCommitHistory();
 
@@ -371,7 +371,7 @@ void ApiServer::start(int port)
         res.set_content(json, "application/json");
     });
 
-    // --- GET /api/changes -------------------------------------------
+    // GET /api/changes 
     svr.Get("/api/changes", [](const httplib::Request&, httplib::Response& res) {
         vector<FileChange> changes = VCS::getModifiedFiles();
 
@@ -392,7 +392,7 @@ void ApiServer::start(int port)
         res.set_content(json, "application/json");
     });
 
-    // --- POST /api/diff ---------------------------------------------
+    // POST /api/diff 
     svr.Post("/api/diff", [](const httplib::Request& req, httplib::Response& res) {
         auto params = parseJson(req.body);
 
@@ -435,7 +435,7 @@ void ApiServer::start(int port)
         res.set_content(json, "application/json");
     });
 
-    // --- POST /api/branch -------------------------------------------
+    // POST /api/branch
     svr.Post("/api/branch", [](const httplib::Request& req, httplib::Response& res) {
         auto params = parseJson(req.body);
 
@@ -450,7 +450,7 @@ void ApiServer::start(int port)
         res.set_content("{\"success\":true}", "application/json");
     });
 
-    // --- POST /api/checkout -----------------------------------------
+    // POST /api/checkout
     svr.Post("/api/checkout", [](const httplib::Request& req, httplib::Response& res) {
         auto params = parseJson(req.body);
 
@@ -465,7 +465,7 @@ void ApiServer::start(int port)
         res.set_content("{\"success\":true}", "application/json");
     });
 
-    // --- GET /api/config --------------------------------------------
+    //  GET /api/config
     svr.Get("/api/config", [](const httplib::Request&, httplib::Response& res) {
         string token = ConfigManager::loadToken();
         string username = ConfigManager::get("username");
@@ -482,7 +482,7 @@ void ApiServer::start(int port)
         res.set_content(json, "application/json");
     });
 
-    // --- POST /api/config -------------------------------------------
+    // POST /api/config 
     svr.Post("/api/config", [](const httplib::Request& req, httplib::Response& res) {
         auto params = parseJson(req.body);
 
@@ -504,7 +504,7 @@ void ApiServer::start(int port)
         res.set_content("{\"success\":true}", "application/json");
     });
 
-    // --- GET /api/object/:hash --------------------------------------
+    //  GET /api/object/:hash 
     svr.Get("/api/object/:hash", [](const httplib::Request& req, httplib::Response& res) {
         string hash = req.path_params.at("hash");
         string content = Storage::getObject(hash);
@@ -513,7 +513,7 @@ void ApiServer::start(int port)
         res.set_content(json, "application/json");
     });
 
-    // --- POST /api/revert -------------------------------------------
+    //  POST /api/revert
     svr.Post("/api/revert", [](const httplib::Request& req, httplib::Response& res) {
         auto params = parseJson(req.body);
 
@@ -569,14 +569,9 @@ void ApiServer::start(int port)
         }
     });
 
-    // --- Start server ----------------------------------------------
-    cout << "\n";
-    cout << "  +----------------------------------------+\n";
+    // Start server
     cout << "  |   Mini-Git API Server                  |\n";
     cout << "  |   http://localhost:" << port << "               |\n";
     cout << "  |   Press Ctrl+C to stop                 |\n";
-    cout << "  +----------------------------------------+\n";
-    cout << "\n";
-
     svr.listen("localhost", port);
 }
