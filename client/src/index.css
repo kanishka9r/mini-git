@@ -1,0 +1,204 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+:root {
+  --bg-primary: #f6f7f3;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #eef2ea;
+  --bg-hover: #e2eadf;
+  --border-color: #d7ded2;
+  --border-active: #2f7d78;
+  --text-primary: #17201c;
+  --text-secondary: #47534d;
+  --text-muted: #6f7a73;
+
+  --accent-blue: #315f9f;
+  --accent-green: #2f7d52;
+  --accent-red: #b04444;
+  --accent-yellow: #a66b24;
+  --accent-purple: #7457a8;
+
+  --btn-green: #2f7d52;
+  --btn-green-hover: #276946;
+  --btn-blue: #2f7d78;
+  --btn-blue-hover: #256965;
+  --btn-red: #b04444;
+  --btn-red-hover: #953737;
+
+  --shadow-card: 0 12px 32px rgba(42, 55, 48, 0.08), 0 1px 0 rgba(255, 255, 255, 0.75) inset;
+  --shadow-soft: 0 8px 22px rgba(47, 125, 120, 0.16);
+}
+
+@theme {
+  --color-bg-primary: var(--bg-primary);
+  --color-bg-secondary: var(--bg-secondary);
+  --color-bg-tertiary: var(--bg-tertiary);
+  --color-bg-hover: var(--bg-hover);
+  --color-border: var(--border-color);
+  --color-border-active: var(--border-active);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-accent-blue: var(--accent-blue);
+  --color-accent-green: var(--accent-green);
+  --color-accent-red: var(--accent-red);
+  --color-accent-yellow: var(--accent-yellow);
+  --color-accent-purple: var(--accent-purple);
+  --color-btn-green: var(--btn-green);
+  --color-btn-green-hover: var(--btn-green-hover);
+  --color-btn-blue: var(--btn-blue);
+  --color-btn-blue-hover: var(--btn-blue-hover);
+  --color-btn-red: var(--btn-red);
+  --color-btn-red-hover: var(--btn-red-hover);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    linear-gradient(135deg, rgba(47, 125, 120, 0.08), transparent 34%),
+    linear-gradient(225deg, rgba(116, 87, 168, 0.06), transparent 38%),
+    var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: 'Inter', 'Segoe UI Variable', 'Segoe UI', Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  min-height: 40px;
+}
+
+input {
+  min-height: 42px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.75) inset;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-border-active) 24%, transparent);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c7d2c2;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9faf99;
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', 'Cascadia Mono', Consolas, monospace;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInFast {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-fade-in-fast {
+  animation: fadeInFast 0.15s ease-out both;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.diff-added {
+  color: var(--color-accent-green);
+  background-color: color-mix(in srgb, var(--color-accent-green) 10%, transparent);
+}
+
+.diff-removed {
+  color: var(--color-accent-red);
+  background-color: color-mix(in srgb, var(--color-accent-red) 10%, transparent);
+}
+
+.diff-context {
+  color: var(--color-text-secondary);
+}
+
+.card {
+  background: color-mix(in srgb, var(--color-bg-secondary) 94%, var(--color-bg-tertiary));
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 1.35rem;
+  box-shadow: var(--shadow-card);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.card:hover {
+  border-color: color-mix(in srgb, var(--color-border-active) 28%, var(--color-border));
+}
+
+input:focus,
+button:focus-visible {
+  outline: none;
+  border-color: var(--color-border-active);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-border-active) 18%, transparent);
+}
+
+.statusbar {
+  min-height: 32px;
+}
