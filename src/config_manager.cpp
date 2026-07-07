@@ -7,7 +7,7 @@ using namespace std;
 
 const string ConfigManager::CONFIG_PATH = ".vcs/config";
 
-// internal helpers 
+//  Internal helpers 
 
 unordered_map<string, string> ConfigManager::readConfig()
 {
@@ -17,6 +17,9 @@ unordered_map<string, string> ConfigManager::readConfig()
 
     while (getline(file, line))
     {
+        if (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+        }
         size_t pos = line.find('=');
         if (pos == string::npos)
             continue;
@@ -29,26 +32,26 @@ unordered_map<string, string> ConfigManager::readConfig()
     return data;
 }
 
-void ConfigManager::writeConfig(const unordered_map<string, string> &data)
+void ConfigManager::writeConfig(const unordered_map<string, string>& data)
 {
     ofstream file(CONFIG_PATH, ios::trunc);
 
-    for (const auto &pair : data)
+    for (const auto& pair : data)
     {
         file << pair.first << "=" << pair.second << "\n";
     }
 }
 
-// Generic key value access 
+//  Generic key-value access 
 
-void ConfigManager::set(const string &key, const string &value)
+void ConfigManager::set(const string& key, const string& value)
 {
     auto data = readConfig();
     data[key] = value;
     writeConfig(data);
 }
 
-string ConfigManager::get(const string &key, const string &defaultValue)
+string ConfigManager::get(const string& key, const string& defaultValue)
 {
     auto data = readConfig();
     auto it = data.find(key);
@@ -59,9 +62,9 @@ string ConfigManager::get(const string &key, const string &defaultValue)
     return defaultValue;
 }
 
-// tokens
+//  Token management 
 
-void ConfigManager::saveToken(const string &token)
+void ConfigManager::saveToken(const string& token)
 {
     set("token", token);
 }
@@ -76,9 +79,9 @@ bool ConfigManager::isLoggedIn()
     return !loadToken().empty();
 }
 
-// remote repository
+//  Remote repository info 
 
-void ConfigManager::saveRemote(const string &owner, const string &repo, const string &url)
+void ConfigManager::saveRemote(const string& owner, const string& repo, const string& url)
 {
     auto data = readConfig();
     data["remote_owner"] = owner;
@@ -93,7 +96,8 @@ RemoteInfo ConfigManager::loadRemote()
     return {
         data["remote_owner"],
         data["remote_repo"],
-        data["remote_url"]};
+        data["remote_url"]
+    };
 }
 
 bool ConfigManager::hasRemote()

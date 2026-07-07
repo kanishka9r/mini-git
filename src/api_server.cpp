@@ -12,41 +12,32 @@
 #include <sstream>
 #include <sys/stat.h>
 #include <direct.h>
+#include <filesystem>
 
 using namespace std;
+namespace fs = std::filesystem;
 
-// --- Simple JSON helpers (no external JSON library needed) ---------
+//  Simple JSON helpers (no external JSON library needed) 
 
-static string jsonEscape(const string &s)
+static string jsonEscape(const string& s)
 {
     string out;
     for (char c : s)
     {
         switch (c)
         {
-        case '"':
-            out += "\\\"";
-            break;
-        case '\\':
-            out += "\\\\";
-            break;
-        case '\n':
-            out += "\\n";
-            break;
-        case '\r':
-            out += "\\r";
-            break;
-        case '\t':
-            out += "\\t";
-            break;
-        default:
-            out += c;
+            case '"':  out += "\\\""; break;
+            case '\\': out += "\\\\"; break;
+            case '\n': out += "\\n";  break;
+            case '\r': out += "\\r";  break;
+            case '\t': out += "\\t";  break;
+            default:   out += c;
         }
     }
     return out;
 }
 
-static string jsonUnescape(const string &s)
+static string jsonUnescape(const string& s)
 {
     string out;
     for (size_t i = 0; i < s.size(); ++i)
@@ -56,24 +47,12 @@ static string jsonUnescape(const string &s)
             char next = s[++i];
             switch (next)
             {
-            case '"':
-                out += '"';
-                break;
-            case '\\':
-                out += '\\';
-                break;
-            case 'n':
-                out += '\n';
-                break;
-            case 'r':
-                out += '\r';
-                break;
-            case 't':
-                out += '\t';
-                break;
-            default:
-                out += next;
-                break;
+                case '"': out += '"'; break;
+                case '\\': out += '\\'; break;
+                case 'n': out += '\n'; break;
+                case 'r': out += '\r'; break;
+                case 't': out += '\t'; break;
+                default: out += next; break;
             }
         }
         else
@@ -84,7 +63,7 @@ static string jsonUnescape(const string &s)
     return out;
 }
 
-static bool directoryExists(const string &path)
+static bool directoryExists(const string& path)
 {
     struct stat st;
     return stat(path.c_str(), &st) == 0 && (st.st_mode & S_IFDIR);
@@ -92,7 +71,7 @@ static bool directoryExists(const string &path)
 
 // Parse a simple JSON object string into key-value pairs
 // Supports: { "key": "value", "key2": "value2" }
-static unordered_map<string, string> parseJson(const string &body)
+static unordered_map<string, string> parseJson(const string& body)
 {
     unordered_map<string, string> result;
     size_t i = 0;
@@ -101,49 +80,62 @@ static unordered_map<string, string> parseJson(const string &body)
     {
         // Find key
         size_t keyStart = body.find('"', i);
-        if (keyStart == string::npos)
-            break;
+        if (keyStart == string::npos) break;
         size_t keyEnd = body.find('"', keyStart + 1);
-        if (keyEnd == string::npos)
-            break;
+        if (keyEnd == string::npos) break;
 
         string key = body.substr(keyStart + 1, keyEnd - keyStart - 1);
 
         // Find colon
         size_t colon = body.find(':', keyEnd + 1);
-        if (colon == string::npos)
-            break;
+        if (colon == string::npos) break;
 
-        // Find value - skip whitespace
+        // Find value skip whitespace
         size_t valStart = colon + 1;
         while (valStart < body.size() && (body[valStart] == ' ' || body[valStart] == '\t'))
             valStart++;
 
-        if (valStart >= body.size())
-            break;
+        if (valStart >= body.size()) break;
 
         string value;
 
         if (body[valStart] == '"')
         {
             // String value
-            size_t valEnd = body.find('"', valStart + 1);
-            if (valEnd == string::npos)
-                break;
+            size_t valEnd = valStart + 1;
+            while (valEnd < body.size()) {
+                if (body[valEnd] == '"' && body[valEnd-1] != '\\') {
+                    break;
+                }
+                valEnd++;
+            }
+            if (valEnd >= body.size()) break;
             value = jsonUnescape(body.substr(valStart + 1, valEnd - valStart - 1));
             i = valEnd + 1;
         }
         else if (body[valStart] == '[')
         {
-            // Array value - find matching bracket
+            // Array value find matching bracket
             int depth = 1;
             size_t pos = valStart + 1;
             while (pos < body.size() && depth > 0)
             {
-                if (body[pos] == '[')
-                    depth++;
-                else if (body[pos] == ']')
-                    depth--;
+                if (body[pos] == '[') depth++;
+                else if (body[pos] == ']') depth--;
+                pos++;
+            }
+            value = body.substr(valStart, pos - valStart);
+            i = pos;
+        }
+        else if (body[valStart] == '{')
+        {
+            // Object value find matching bracket
+            int depth = 1;
+            size_t pos = valStart + 1;
+            while (pos < body.size() && depth > 0)
+            {
+                if (body[pos] == '{') depth++;
+                else if (body[pos] == '}') depth--;
                 pos++;
             }
             value = body.substr(valStart, pos - valStart);
@@ -167,8 +159,7 @@ static unordered_map<string, string> parseJson(const string &body)
         {
             // Number or other
             size_t valEnd = body.find_first_of(",}", valStart);
-            if (valEnd == string::npos)
-                valEnd = body.size();
+            if (valEnd == string::npos) valEnd = body.size();
             value = body.substr(valStart, valEnd - valStart);
             // Trim whitespace
             while (!value.empty() && (value.back() == ' ' || value.back() == '\n' || value.back() == '\r'))
@@ -183,7 +174,7 @@ static unordered_map<string, string> parseJson(const string &body)
 }
 
 // Parse a JSON array of strings: ["file1.txt", "file2.txt"]
-static vector<string> parseJsonStringArray(const string &arr)
+static vector<string> parseJsonStringArray(const string& arr)
 {
     vector<string> result;
     size_t i = 0;
@@ -191,11 +182,9 @@ static vector<string> parseJsonStringArray(const string &arr)
     while (i < arr.size())
     {
         size_t start = arr.find('"', i);
-        if (start == string::npos)
-            break;
+        if (start == string::npos) break;
         size_t end = arr.find('"', start + 1);
-        if (end == string::npos)
-            break;
+        if (end == string::npos) break;
 
         result.push_back(arr.substr(start + 1, end - start - 1));
         i = end + 1;
@@ -204,13 +193,13 @@ static vector<string> parseJsonStringArray(const string &arr)
     return result;
 }
 
-// API Server Implementation
+//  API server implementation 
 
 void ApiServer::start(int port)
 {
     httplib::Server svr;
 
-    // CORS middleware
+    //  cors middleware 
     svr.set_pre_routing_handler([](const httplib::Request&, httplib::Response& res) {
         res.set_header("Access-Control-Allow-Origin", "*");
         res.set_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
@@ -218,7 +207,7 @@ void ApiServer::start(int port)
         return httplib::Server::HandlerResponse::Unhandled;
     });
 
-    // Handle preflight OPTIONS requests
+    // Handle preflight options requests
     svr.Options(".*", [](const httplib::Request&, httplib::Response& res) {
         res.set_header("Access-Control-Allow-Origin", "*");
         res.set_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
@@ -226,7 +215,7 @@ void ApiServer::start(int port)
         res.status = 204;
     });
 
-    // POST /api/workspace 
+    //  POST /api/workspace 
     svr.Post("/api/workspace", [](const httplib::Request& req, httplib::Response& res) {
         auto params = parseJson(req.body);
 
@@ -261,7 +250,7 @@ void ApiServer::start(int port)
         }
     });
 
-    // GET /api/status 
+    //  GET /api/status 
     svr.Get("/api/status", [](const httplib::Request&, httplib::Response& res) {
         bool init = VCS::isInitialized();
         string branch = init ? Branch::getCurrentBranch() : "";
@@ -288,7 +277,7 @@ void ApiServer::start(int port)
         res.set_content("{\"success\":true,\"message\":\"Initialized empty VCS repository!\"}", "application/json");
     });
 
-    // POST /api/add 
+    //  POST /api/add 
     svr.Post("/api/add", [](const httplib::Request& req, httplib::Response& res) {
         auto params = parseJson(req.body);
 
@@ -313,7 +302,7 @@ void ApiServer::start(int port)
         res.set_content("{\"success\":true,\"staged\":" + to_string(files.size()) + "}", "application/json");
     });
 
-    // POST /api/commit 
+    //  POST /api/commit 
     svr.Post("/api/commit", [](const httplib::Request& req, httplib::Response& res) {
         auto params = parseJson(req.body);
 
@@ -335,7 +324,7 @@ void ApiServer::start(int port)
         res.set_content("{\"success\":true,\"hash\":\"" + jsonEscape(hash) + "\"}", "application/json");
     });
 
-    // GET /api/log 
+    //  GET /api/log 
     svr.Get("/api/log", [](const httplib::Request&, httplib::Response& res) {
         vector<Commit> history = VCS::getCommitHistory();
 
@@ -371,7 +360,7 @@ void ApiServer::start(int port)
         res.set_content(json, "application/json");
     });
 
-    // GET /api/changes 
+    //  GET /api/changes 
     svr.Get("/api/changes", [](const httplib::Request&, httplib::Response& res) {
         vector<FileChange> changes = VCS::getModifiedFiles();
 
@@ -392,7 +381,7 @@ void ApiServer::start(int port)
         res.set_content(json, "application/json");
     });
 
-    // POST /api/diff 
+    //  POST /api/diff 
     svr.Post("/api/diff", [](const httplib::Request& req, httplib::Response& res) {
         auto params = parseJson(req.body);
 
@@ -405,14 +394,14 @@ void ApiServer::start(int port)
             oldContent = Storage::getObject(params["oldHash"]);
         }
 
-        // Get new content - either from request body or from file
+        // Get new content either from request body or from file
         if (params.find("newContent") != params.end())
         {
             newContent = params["newContent"];
         }
         else if (params.find("filename") != params.end())
         {
-            ifstream file(params["filename"]);
+            ifstream file(params["filename"], ios::binary);
             if (file)
             {
                 newContent = string((istreambuf_iterator<char>(file)),
@@ -435,7 +424,7 @@ void ApiServer::start(int port)
         res.set_content(json, "application/json");
     });
 
-    // POST /api/branch
+    //  POST /api/branch 
     svr.Post("/api/branch", [](const httplib::Request& req, httplib::Response& res) {
         auto params = parseJson(req.body);
 
@@ -450,7 +439,7 @@ void ApiServer::start(int port)
         res.set_content("{\"success\":true}", "application/json");
     });
 
-    // POST /api/checkout
+    //  POST /api/checkout 
     svr.Post("/api/checkout", [](const httplib::Request& req, httplib::Response& res) {
         auto params = parseJson(req.body);
 
@@ -465,7 +454,7 @@ void ApiServer::start(int port)
         res.set_content("{\"success\":true}", "application/json");
     });
 
-    //  GET /api/config
+    //  GET /api/config 
     svr.Get("/api/config", [](const httplib::Request&, httplib::Response& res) {
         string token = ConfigManager::loadToken();
         string username = ConfigManager::get("username");
@@ -482,7 +471,7 @@ void ApiServer::start(int port)
         res.set_content(json, "application/json");
     });
 
-    // POST /api/config 
+    //  POST /api/config 
     svr.Post("/api/config", [](const httplib::Request& req, httplib::Response& res) {
         auto params = parseJson(req.body);
 
@@ -513,7 +502,7 @@ void ApiServer::start(int port)
         res.set_content(json, "application/json");
     });
 
-    //  POST /api/revert
+    //  POST /api/revert 
     svr.Post("/api/revert", [](const httplib::Request& req, httplib::Response& res) {
         auto params = parseJson(req.body);
 
@@ -531,12 +520,25 @@ void ApiServer::start(int port)
             // Load the target commit
             Commit target = Commit::getCommit(targetHash);
 
+            // Clean working directory
+            string currentHead = Branch::getHeadCommit();
+            if (!currentHead.empty()) {
+                Commit headCommit = Commit::getCommit(currentHead);
+                VCS::cleanWorkingDirectory(headCommit.files, target.files);
+            }
+
             // Restore all files from the target commit's snapshot
             vector<string> filenames;
             for (const auto& pair : target.files)
             {
                 string content = Storage::getObject(pair.second);
-                ofstream out(pair.first);
+                
+                fs::path p(pair.first);
+                if (p.has_parent_path()) {
+                    fs::create_directories(p.parent_path());
+                }
+
+                ofstream out(pair.first, ios::binary);
                 out << content;
                 out.close();
                 filenames.push_back(pair.first);
@@ -569,9 +571,15 @@ void ApiServer::start(int port)
         }
     });
 
-    // Start server
+    //  Start server 
+    cout << "\n";
+    cout << "  ------------------------------------------\n";
     cout << "  |   Mini-Git API Server                  |\n";
     cout << "  |   http://localhost:" << port << "               |\n";
     cout << "  |   Press Ctrl+C to stop                 |\n";
+    cout << "  ------------------------------------------\n";
+    cout << "\n";
+
     svr.listen("localhost", port);
 }
+

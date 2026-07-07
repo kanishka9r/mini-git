@@ -23,8 +23,15 @@ void Branch::createBranch(const string& name){
 
     string commitHash;
     ifstream f(".vcs/refs/" + currentBranch);
-    getline(f, commitHash);
-    f.close();
+    if (f) {
+        getline(f, commitHash);
+        f.close();
+    }
+
+    if (commitHash.empty()) {
+        cout << "Cannot create a branch before the first commit." << endl;
+        return;
+    }
 
     ofstream newBranch(path);
     newBranch << commitHash;

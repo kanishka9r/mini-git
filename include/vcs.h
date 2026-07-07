@@ -7,6 +7,7 @@
 
 using namespace std;
 
+// Represents a file change detected in the working directory
 struct FileChange {
     string filename;
     string status;  // "modified", "added", "deleted"
@@ -16,6 +17,10 @@ struct FileChange {
 
 class VCS {
 public:
+    static string normalizePath(string path);
+    static void cleanWorkingDirectory(const unordered_map<string, string>& currentFiles, const unordered_map<string, string>& targetFiles);
+
+    //  Existing CLI API 
     static void init();
     static void add(const string& filename);
     static void commit(const string& message);
@@ -24,6 +29,7 @@ public:
     static void log();
     static void logGraph();
 
+    //  New GUI-facing API (returns data instead of printing) 
     static string commitAndReturnHash(const string& message);
     static vector<Commit> getCommitHistory();
     static vector<FileChange> getModifiedFiles();

@@ -132,7 +132,10 @@ for (const string& line : diffOutput)
     cout << line << endl;
 }
 
+
 }
+
+//  GUI-facing compute diff from content strings 
 
 vector<DiffLine> Diff::compute(const string& content1, const string& content2)
 {

@@ -10,11 +10,31 @@
 #include "branch.h"
 #include "graph.h"
 #include <queue>
-#include <filesystem>
 
+#include <filesystem>
 using namespace std;
 namespace fs = std::filesystem;
 
+string VCS::normalizePath(string path) {
+    for (char& c : path) { if (c == '\\') c = '/'; }
+    if (path.length() >= 2 && path[0] == '.' && path[1] == '/') {
+        path = path.substr(2);
+    }
+    return path;
+}
+
+void VCS::cleanWorkingDirectory(const unordered_map<string, string>& currentFiles, const unordered_map<string, string>& targetFiles) {
+    for (const auto& pair : currentFiles) {
+        string path = pair.first;
+        if (targetFiles.find(path) == targetFiles.end()) {
+            try {
+                fs::remove(fs::path(path));
+            } catch (const fs::filesystem_error& e) {
+                cout << "Error removing file: " << e.what() << endl;
+            }
+        }
+    }
+}
 
 void VCS::init()
 {
@@ -52,37 +72,31 @@ void VCS::add(const string &filename)
         return;
     }
 
-    ifstream file(filename);
-    if (!file)
-    {
-        cout << "File not found!" << endl;
-        return;
-    }
+    string normFile = normalizePath(filename);
+    ifstream file(normFile, ios::binary);
 
-    string content((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
-
-    const string hash = Storage::computeHash(content);
-
-    //? maybe we can pass the hash calculated above
-    Storage::storeObject(content);
-
-    //! changed the logic
-    //* now we read the index file again and then append the new file
-    //* to avoid duplication
     auto stagingArea = Storage::readIndex();
 
-    stagingArea[filename] = hash;
+    if (!file)
+    {
+        stagingArea[normFile] = "";
+        cout << "Staged deletion for " + normFile << endl;
+    }
+    else
+    {
+        string content((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
+        const string hash = Storage::computeHash(content);
+        Storage::storeObject(content);
+        stagingArea[normFile] = hash;
+        cout << "Added " + normFile + " to staging" << endl;
+    }
 
     ofstream index(".vcs/index", ios::trunc);
-
     for (auto &p : stagingArea)
     {
         index << p.first << ":" << p.second << endl;
     }
-
     index.close();
-
-    cout << "Added " + filename + " to staging" << endl;
 }
 
 void VCS::commit(const string &message)
@@ -103,23 +117,43 @@ void VCS::commit(const string &message)
         return;
     }
 
-    // from branch.cpp
-    //! fixed the hardcoded main branch
     string currentBranch = Branch::getCurrentBranch();
+    if (currentBranch.empty()) {
+        cout << "Cannot commit in detached HEAD state. Please checkout a branch first." << endl;
+        return;
+    }
+
     string parentHash = Branch::getHead(currentBranch);
+    
+    unordered_map<string, string> parentFiles;
+    if (!parentHash.empty()) {
+        parentFiles = Commit::getCommit(parentHash).files;
+    }
+    
+    unordered_map<string, string> commitFiles = parentFiles;
+    for (auto &p : stagingArea) {
+        if (p.second == "") {
+            commitFiles.erase(p.first);
+        } else {
+            commitFiles[p.first] = p.second;
+        }
+    }
+    
+    if (commitFiles == parentFiles) {
+        cout << "Nothing to commit (empty commit)" << endl;
+        return;
+    }
 
     time_t now = time(0);
-
     string raw = message + parentHash + to_string(now);
-    //! changed the hashing method
-    for (auto &p : stagingArea)
+    for (auto &p : commitFiles)
     {
         raw += p.first + p.second;
     }
 
     string commitHash = Storage::computeHash(raw);
 
-    Commit::saveCommitRaw(commitHash, parentHash, now, message, stagingArea);
+    Commit::saveCommitRaw(commitHash, parentHash, now, message, commitFiles);
 
     Branch::updateHead(currentBranch, commitHash);
 
@@ -185,6 +219,13 @@ void VCS::checkout(const string &name)
         return;
     }
 
+    // Safety check: Prevent destructive checkout
+    auto changes = getModifiedFiles();
+    if (!changes.empty()) {
+        cout << "error: Your local changes would be overwritten by checkout. Please commit or stash them.\n";
+        return;
+    }
+
     // Check branch exists
     string refPath = ".vcs/refs/" + name;
     if (stat(refPath.c_str(), &st) != 0)
@@ -193,7 +234,7 @@ void VCS::checkout(const string &name)
         return;
     }
 
-    // Update HEAD → branch
+    // Update HEAD  branch
     ofstream headFile(".vcs/HEAD");
     headFile << name;
     headFile.close();
@@ -210,8 +251,15 @@ void VCS::checkout(const string &name)
         return;
     }
 
-    // Load commit snapshot (via API)
+    // Load commit snapshot 
     Commit commit = Commit::getCommit(commitHash);
+
+    // Clean working directory
+    string currentHead = Branch::getHeadCommit();
+    if (!currentHead.empty()) {
+        Commit headCommit = Commit::getCommit(currentHead);
+        cleanWorkingDirectory(headCommit.files, commit.files);
+    }
 
     // Restore files
     for (auto &it : commit.files)
@@ -221,7 +269,12 @@ void VCS::checkout(const string &name)
 
         string content = Storage::getObject(hash);
 
-        ofstream out(filename);
+        fs::path p(filename);
+        if (p.has_parent_path()) {
+            fs::create_directories(p.parent_path());
+        }
+
+        ofstream out(filename, ios::binary);
         out << content;
         out.close();
     }
@@ -233,7 +286,7 @@ void VCS::branch(const string& name){
     Branch::createBranch(name);
 }
 
-//gui based code
+//  New GUI-facing API 
 
 bool VCS::isInitialized() {
     struct stat st;
@@ -286,14 +339,18 @@ void VCS::addMultiple(const vector<string>& filenames) {
     auto stagingArea = Storage::readIndex();
     
     for (const string& filename : filenames) {
-        ifstream file(filename);
-        if (!file) continue;
+        string normFile = normalizePath(filename);
+        ifstream file(normFile, ios::binary);
+        if (!file) {
+            stagingArea[normFile] = "";
+            continue;
+        }
         
         string content((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
         string hash = Storage::computeHash(content);
         Storage::storeObject(content);
         
-        stagingArea[filename] = hash;
+        stagingArea[normFile] = hash;
     }
     
     ofstream index(".vcs/index", ios::trunc);
@@ -318,18 +375,15 @@ vector<FileChange> VCS::getModifiedFiles() {
         for (auto it = fs::recursive_directory_iterator("."); it != fs::recursive_directory_iterator(); ++it) {
             if (it->is_directory()) {
                 string name = it->path().filename().string();
-                if (name == ".vcs" || name == ".git" || name == "frontend" || name == "build" || name == "node_modules") {
+                if (name == ".vcs" || name == ".git" || name == "build" || name == "client" || name == "node_modules") {
                     it.disable_recursion_pending();
                     continue;
                 }
             } else if (it->is_regular_file()) {
                 string path = it->path().string();
-                if (path.length() >= 2 && path[0] == '.' && (path[1] == '\\' || path[1] == '/')) {
-                    path = path.substr(2);
-                }
-                for (char& c : path) { if (c == '\\') c = '/'; }
+                path = normalizePath(path);
 
-                ifstream file(path);
+                ifstream file(path, ios::binary);
                 if (file) {
                     string content((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
                     string hash = Storage::computeHash(content);

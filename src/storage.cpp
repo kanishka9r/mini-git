@@ -31,7 +31,7 @@ void Storage::storeObject(const string &content)
         return; // already exists
     }
 
-    ofstream file(path);
+    ofstream file(path, ios::binary);
     file << content;
     file.close();
 }
@@ -41,13 +41,9 @@ string Storage::getObject(const string &hash)
 {
     string path = ".vcs/objects/" + hash;
 
-    ifstream file(path);
-    string content, line;
-
-    while (getline(file, line))
-    {
-        content += line + "\n";
-    }
+    ifstream file(path, ios::binary);
+    if (!file) return "";
+    string content((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
 
     file.close();
     return content;

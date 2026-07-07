@@ -6,11 +6,12 @@
 #include "commit.h"
 #include "merge.h"
 #include "api_server.h"
+
 using namespace std;
 
 int main(int argc, char* argv[]) {
 
-    //Server Mode: "serve" argument  start REST API 
+    //  Server Mode: serve argument  start REST API 
     if (argc >= 2 && string(argv[1]) == "serve") {
         int port = 8080;
         if (argc >= 3) {
@@ -21,6 +22,7 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
+    //  GUI Mode no arguments  start API server + open browser 
     if (argc < 2) {
         cout << "Starting Mini-Git...\n";
         cout << "Open http://localhost:5173 in your browser (React dev server)\n";
@@ -29,6 +31,7 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
+    //  CLI Mode existing command-line interface
     string cmd = argv[1];
 
     // will call VCS::init()
@@ -52,11 +55,16 @@ int main(int argc, char* argv[]) {
 
     // will call VCS::commit
     else if (cmd == "commit") {
-        if (argc != 3) {
+        if (argc < 3) {
             cout << "Usage: vcs commit <message>\n";
             return 0;
         }
-        VCS::commit(argv[2]);
+        string message = argv[2];
+        for (int i = 3; i < argc; i++) {
+            message += " ";
+            message += argv[i];
+        }
+        VCS::commit(message);
     }
 
     // will call VCS::branch()
