@@ -23,6 +23,8 @@ public:
     //  Existing CLI API 
     static void init();
     static void add(const string& filename);
+    static void unstage(const string& filename);
+    static void untrack(const string& filename);
     static void commit(const string& message);
     static void branch(const string& name);
     static void checkout(const string& name);

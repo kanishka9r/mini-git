@@ -23,3 +23,9 @@ diff <commit1> <commit2>
 
 merge <branch>
   - Merge branch into current branch
+
+unstage <file>
+  - Remove a file from the staging area
+
+untrack <file>
+  - Stop tracking a committed file without deleting it from disk

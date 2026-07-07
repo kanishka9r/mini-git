@@ -286,6 +286,42 @@ void VCS::branch(const string& name){
     Branch::createBranch(name);
 }
 
+void VCS::unstage(const string& filename) {
+    struct stat st;
+    if (stat(".vcs", &st) != 0) { cout << "Repository not initialized!" << endl; return; }
+    
+    string normFile = normalizePath(filename);
+    auto stagingArea = Storage::readIndex();
+    
+    if (stagingArea.find(normFile) != stagingArea.end()) {
+        stagingArea.erase(normFile);
+        
+        ofstream index(".vcs/index", ios::trunc);
+        for (auto &p : stagingArea) { index << p.first << ":" << p.second << endl; }
+        index.close();
+        
+        cout << "Unstaged " << normFile << endl;
+    } else {
+        cout << "File is not staged." << endl;
+    }
+}
+
+void VCS::untrack(const string& filename) {
+    struct stat st;
+    if (stat(".vcs", &st) != 0) { cout << "Repository not initialized!" << endl; return; }
+    
+    string normFile = normalizePath(filename);
+    auto stagingArea = Storage::readIndex();
+    
+    stagingArea[normFile] = "";
+    
+    ofstream index(".vcs/index", ios::trunc);
+    for (auto &p : stagingArea) { index << p.first << ":" << p.second << endl; }
+    index.close();
+    
+    cout << "Untracked " << normFile << " (It will be removed from the next commit)" << endl;
+}
+
 //  New GUI-facing API 
 
 bool VCS::isInitialized() {

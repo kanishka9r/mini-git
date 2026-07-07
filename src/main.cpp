@@ -53,6 +53,22 @@ int main(int argc, char* argv[]) {
         VCS::add(argv[2]);
     }
 
+    else if (cmd == "unstage") {
+        if (argc != 3) {
+            cout << "Usage: vcs unstage <file>\n";
+            return 0;
+        }
+        VCS::unstage(argv[2]);
+    }
+
+    else if (cmd == "untrack") {
+        if (argc != 3) {
+            cout << "Usage: vcs untrack <file>\n";
+            return 0;
+        }
+        VCS::untrack(argv[2]);
+    }
+
     // will call VCS::commit
     else if (cmd == "commit") {
         if (argc < 3) {
