@@ -4,7 +4,6 @@
 #include "diff.h"
 #include "branch.h"
 #include "commit.h"
-#include "merge.h"
 #include "api_server.h"
 
 using namespace std;
@@ -119,10 +118,6 @@ int main(int argc, char* argv[]) {
     Diff::run(argv[2], argv[3]);
     }
     
-    else if (cmd == "merge") {
-        // will call Merge::run()
-    }
-
     // will call Storage::getObject
     else if (cmd == "cat-object") {
     if (argc != 3) {

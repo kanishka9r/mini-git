@@ -571,7 +571,83 @@ void ApiServer::start(int port)
         }
     });
 
-    //  Start server 
+    // ─── POST /api/pull-file ─────────────────────────────────────────
+    svr.Post("/api/pull-file", [](const httplib::Request& req, httplib::Response& res) {
+        auto params = parseJson(req.body);
+
+        if (params.find("path") == params.end() || params.find("content") == params.end())
+        {
+            res.status = 400;
+            res.set_content("{\"success\":false,\"message\":\"Missing path or content\"}", "application/json");
+            return;
+        }
+
+        string path = params["path"];
+        string content = jsonUnescape(params["content"]);
+
+        bool isConflict = false;
+
+        ifstream inFile(path, ios::binary);
+        if (inFile)
+        {
+            string localContent((istreambuf_iterator<char>(inFile)), istreambuf_iterator<char>());
+            inFile.close();
+
+            if (localContent != content)
+            {
+                string currentHead = Branch::getHeadCommit();
+                string headContent = "";
+                if (!currentHead.empty())
+                {
+                    Commit headCommit = Commit::getCommit(currentHead);
+                    if (headCommit.files.find(path) != headCommit.files.end())
+                    {
+                        headContent = Storage::getObject(headCommit.files[path]);
+                    }
+                }
+
+                if (localContent != headContent)
+                {
+                    // User has edited it locally! Conflict!
+                    isConflict = true;
+                }
+            }
+        }
+
+        if (isConflict)
+        {
+            string remotePath = path + ".remote";
+            string localPath = path + ".local";
+
+            // Rename local file
+            if (fs::exists(localPath)) fs::remove(localPath);
+            fs::rename(path, localPath);
+
+            // Save remote file
+            ofstream outRemote(remotePath, ios::binary);
+            outRemote << content;
+            outRemote.close();
+
+            res.status = 409;
+            res.set_content("{\"success\":false,\"conflict\":true,\"message\":\"Conflict in " + jsonEscape(path) + "\"}", "application/json");
+        }
+        else
+        {
+            // No local edits, just overwrite with GitHub's version!
+            fs::path p(path);
+            if (p.has_parent_path()) {
+                fs::create_directories(p.parent_path());
+            }
+
+            ofstream out(path, ios::binary);
+            out << content;
+            out.close();
+
+            res.set_content("{\"success\":true,\"message\":\"Pulled " + jsonEscape(path) + "\"}", "application/json");
+        }
+    });
+
+    // ─── Start server ────────────────────────────────────────────────
     cout << "\n";
     cout << "  ------------------------------------------\n";
     cout << "  |   Mini-Git API Server                  |\n";
