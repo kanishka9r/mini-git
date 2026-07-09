@@ -5,6 +5,17 @@
 
 using namespace std;
 
+enum class StageOperation {
+    OP_ADD,
+    OP_MODIFY,
+    OP_DELETE
+};
+
+struct StageEntry {
+    StageOperation operation;
+    string hash;
+};
+
 class Storage
 {
 public:
@@ -17,7 +28,8 @@ public:
     // retrieve stored object
     static string getObject(const string &hash);
 
-    static unordered_map<string, string> readIndex();
+    static unordered_map<string, StageEntry> readIndex();
+    static void writeIndex(const unordered_map<string, StageEntry>& stagingArea);
 
     static void clearIndex();
 };

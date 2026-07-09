@@ -193,7 +193,7 @@ export default function SavePage() {
                          bg-bg-tertiary hover:bg-bg-hover text-text-secondary hover:text-text-primary
                          transition-colors cursor-pointer"
             >
-              Remove from Staging
+              Unstage
             </button>
           )}
           {(section === 'unstaged' || section === 'untracked') && (
@@ -203,10 +203,10 @@ export default function SavePage() {
                          bg-btn-blue hover:bg-btn-blue-hover text-white
                          transition-colors cursor-pointer shadow-sm"
             >
-              Add to Staging
+              {section === 'untracked' ? 'Track / Stage' : status === 'deleted' ? 'Stage deletion' : 'Stage'}
             </button>
           )}
-          {(section === 'staged' || section === 'unstaged' || section === 'tracked') && (
+          {section === 'tracked' && (
             <button
               onClick={(e) => { e.stopPropagation(); runOp(() => vcsClient.untrack(filename), `Stopped tracking ${filename}`); }}
               className="px-3 py-1 text-xs font-semibold rounded-md border border-accent-red/20
@@ -334,17 +334,17 @@ export default function SavePage() {
                       <button onClick={() => runOp(() => vcsClient.unstage(selectedFile!))}
                         className="px-2.5 py-1 text-xs font-semibold rounded-md border border-border
                                    bg-bg-tertiary hover:bg-bg-hover text-text-secondary transition-colors cursor-pointer">
-                        Remove from Staging
+                        Unstage
                       </button>
                     )}
                     {(selectedSection === 'unstaged' || selectedSection === 'untracked') && (
                       <button onClick={() => runOp(() => vcsClient.add([selectedFile!]))}
                         className="px-2.5 py-1 text-xs font-semibold rounded-md
                                    bg-btn-blue hover:bg-btn-blue-hover text-white transition-colors cursor-pointer">
-                        Add to Staging
+                        {selectedSection === 'untracked' ? 'Track / Stage' : 'Stage'}
                       </button>
                     )}
-                    {selectedSection !== 'untracked' && (
+                    {selectedSection === 'tracked' && (
                       <button onClick={() => runOp(() => vcsClient.untrack(selectedFile!), `Stopped tracking ${selectedFile}`)}
                         className="px-2.5 py-1 text-xs font-semibold rounded-md border border-accent-red/20
                                    bg-transparent hover:bg-accent-red/5 text-accent-red transition-colors cursor-pointer">

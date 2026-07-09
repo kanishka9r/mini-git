@@ -51,24 +51,57 @@ string Storage::getObject(const string &hash)
 
 
 // Read the index and return the staging area map
-unordered_map<string, string> Storage::readIndex()
+unordered_map<string, StageEntry> Storage::readIndex()
 {
-    unordered_map<string, string> stagingArea;
+    unordered_map<string, StageEntry> stagingArea;
 
     ifstream index(".vcs/index");
     string line;
 
     while (getline(index, line))
     {
-        int pos = line.find(":");
+        int pos1 = line.find(":");
+        if (pos1 == string::npos) continue;
 
-        string filename = line.substr(0, pos);
-        string hash = line.substr(pos + 1);
+        string filename = line.substr(0, pos1);
+        string remainder = line.substr(pos1 + 1);
 
-        stagingArea[filename] = hash;
+        int pos2 = remainder.find(":");
+        StageOperation op = StageOperation::OP_MODIFY;
+        string hash = "";
+
+        if (pos2 == string::npos) {
+            // Old format migration (filename:hash or filename:)
+            hash = remainder;
+            if (hash.empty()) op = StageOperation::OP_DELETE;
+        } else {
+            // New format (filename:OP:hash)
+            string opStr = remainder.substr(0, pos2);
+            hash = remainder.substr(pos2 + 1);
+
+            if (opStr == "ADD") op = StageOperation::OP_ADD;
+            else if (opStr == "DELETE") op = StageOperation::OP_DELETE;
+            else op = StageOperation::OP_MODIFY;
+        }
+
+        stagingArea[filename] = {op, hash};
     }
 
     return stagingArea;
+}
+
+void Storage::writeIndex(const unordered_map<string, StageEntry>& stagingArea)
+{
+    ofstream index(".vcs/index", ios::trunc);
+    for (const auto& p : stagingArea)
+    {
+        string opStr = "MODIFY";
+        if (p.second.operation == StageOperation::OP_ADD) opStr = "ADD";
+        else if (p.second.operation == StageOperation::OP_DELETE) opStr = "DELETE";
+
+        index << p.first << ":" << opStr << ":" << p.second.hash << "\n";
+    }
+    index.close();
 }
 
 // Clears the index file

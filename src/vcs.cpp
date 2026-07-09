@@ -104,10 +104,10 @@ void VCS::commit(const string &message)
     
     unordered_map<string, string> commitFiles = parentFiles;
     for (auto &p : stagingArea) {
-        if (p.second == "") {
+        if (p.second.operation == StageOperation::OP_DELETE) {
             commitFiles.erase(p.first);
         } else {
-            commitFiles[p.first] = p.second;
+            commitFiles[p.first] = p.second.hash;
         }
     }
     
@@ -219,54 +219,56 @@ void VCS::checkout(const string &name)
 
     unordered_map<string, string> targetFiles = Commit::getCommit(targetCommitHash).files;
 
-    // Safety check: Prevent destructive checkout
-    for (auto it = fs::recursive_directory_iterator("."); it != fs::recursive_directory_iterator(); ++it) {
-        if (it->is_directory()) {
-            string dirName = it->path().filename().string();
-            if (dirName == ".vcs" || dirName == ".git" || dirName == "build" || dirName == "client" || dirName == "node_modules") {
-                it.disable_recursion_pending();
-                continue;
-            }
-        } else if (it->is_regular_file()) {
-            string path = normalizePath(it->path().string());
-            ifstream file(path, ios::binary);
-            if (file) {
-                string content((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
-                string wtHash = Storage::computeHash(content);
-                
-                bool isUntracked = (headFiles.find(path) == headFiles.end());
-                bool isModified = (!isUntracked && headFiles[path] != wtHash);
-                
-                if (isUntracked || isModified) {
-                    if (targetFiles.find(path) != targetFiles.end()) {
-                        if (targetFiles[path] != wtHash) {
-                            throw runtime_error("Checkout would overwrite local changes in " + path);
+    if (currentHeadHash != targetCommitHash) {
+        // Safety check: Prevent destructive checkout
+        for (auto it = fs::recursive_directory_iterator("."); it != fs::recursive_directory_iterator(); ++it) {
+            if (it->is_directory()) {
+                string dirName = it->path().filename().string();
+                if (dirName == ".vcs" || dirName == ".git" || dirName == "build" || dirName == "client" || dirName == "node_modules") {
+                    it.disable_recursion_pending();
+                    continue;
+                }
+            } else if (it->is_regular_file()) {
+                string path = normalizePath(it->path().string());
+                ifstream file(path, ios::binary);
+                if (file) {
+                    string content((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
+                    string wtHash = Storage::computeHash(content);
+                    
+                    bool isUntracked = (headFiles.find(path) == headFiles.end());
+                    bool isModified = (!isUntracked && headFiles[path] != wtHash);
+                    
+                    if (isUntracked || isModified) {
+                        if (targetFiles.find(path) != targetFiles.end()) {
+                            if (targetFiles[path] != wtHash) {
+                                throw runtime_error("Checkout would overwrite local changes in " + path);
+                            }
+                        } else if (isModified) {
+                            throw runtime_error("Checkout would delete local changes in " + path);
                         }
-                    } else if (isModified) {
-                        throw runtime_error("Checkout would delete local changes in " + path);
                     }
                 }
             }
         }
-    }
 
-    // Clean working directory (delete files tracked by HEAD but not by target branch)
-    cleanWorkingDirectory(headFiles, targetFiles);
+        // Clean working directory (delete files tracked by HEAD but not by target branch)
+        cleanWorkingDirectory(headFiles, targetFiles);
 
-    // Restore files
-    for (auto &it : targetFiles) {
-        const string &filename = it.first;
-        const string &hash = it.second;
+        // Restore files
+        for (auto &it : targetFiles) {
+            const string &filename = it.first;
+            const string &hash = it.second;
 
-        string content = Storage::getObject(hash);
-        fs::path p(filename);
-        if (p.has_parent_path()) {
-            fs::create_directories(p.parent_path());
+            string content = Storage::getObject(hash);
+            fs::path p(filename);
+            if (p.has_parent_path()) {
+                fs::create_directories(p.parent_path());
+            }
+
+            ofstream out(filename, ios::binary);
+            out << content;
+            out.close();
         }
-
-        ofstream out(filename, ios::binary);
-        out << content;
-        out.close();
     }
 
     // Update HEAD branch only after success
@@ -290,11 +292,7 @@ void VCS::unstage(const string& filename) {
     
     if (stagingArea.find(normFile) != stagingArea.end()) {
         stagingArea.erase(normFile);
-        
-        ofstream index(".vcs/index", ios::trunc);
-        for (auto &p : stagingArea) { index << p.first << ":" << p.second << endl; }
-        index.close();
-        
+        Storage::writeIndex(stagingArea);
         cout << "Unstaged " << normFile << endl;
     } else {
         cout << "File is not staged." << endl;
@@ -308,13 +306,21 @@ void VCS::untrack(const string& filename) {
     string normFile = normalizePath(filename);
     auto stagingArea = Storage::readIndex();
     
-    stagingArea[normFile] = "";
+    string current = Branch::getHeadCommit();
+    unordered_map<string, string> headFiles;
+    if (!current.empty()) {
+        headFiles = Commit::getCommit(current).files;
+    }
     
-    ofstream index(".vcs/index", ios::trunc);
-    for (auto &p : stagingArea) { index << p.first << ":" << p.second << endl; }
-    index.close();
+    if (headFiles.find(normFile) != headFiles.end()) {
+        stagingArea[normFile] = {StageOperation::OP_DELETE, ""};
+        cout << "Untracked " << normFile << " (It will be removed from the next commit)" << endl;
+    } else {
+        stagingArea.erase(normFile);
+        cout << "File was not tracked in HEAD, removed from staging if it was staged." << endl;
+    }
     
-    cout << "Untracked " << normFile << " (It will be removed from the next commit)" << endl;
+    Storage::writeIndex(stagingArea);
 }
 
 //  New GUI-facing API 
@@ -343,10 +349,10 @@ string VCS::commitAndReturnHash(const string& message) {
 
     // Apply staged changes to the tree
     for (auto &p : stagingArea) {
-        if (p.second == "") {
+        if (p.second.operation == StageOperation::OP_DELETE) {
             treeFiles.erase(p.first); // Deleted file
         } else {
-            treeFiles[p.first] = p.second; // Added/Modified file
+            treeFiles[p.first] = p.second.hash; // Added/Modified file
         }
     }
 
@@ -397,8 +403,7 @@ void VCS::addMultiple(const vector<string>& filenames) {
     string current = Branch::getHeadCommit();
     unordered_map<string, string> headFiles;
     if (!current.empty()) {
-        Commit headCommit = Commit::getCommit(current);
-        headFiles = headCommit.files;
+        headFiles = Commit::getCommit(current).files;
     }
     
     for (const string& filename : filenames) {
@@ -407,7 +412,7 @@ void VCS::addMultiple(const vector<string>& filenames) {
         if (!file) {
             // If deleted, stage the deletion only if it exists in HEAD
             if (headFiles.find(normFile) != headFiles.end()) {
-                stagingArea[normFile] = "";
+                stagingArea[normFile] = {StageOperation::OP_DELETE, ""};
             } else {
                 stagingArea.erase(normFile);
             }
@@ -418,19 +423,20 @@ void VCS::addMultiple(const vector<string>& filenames) {
         string hash = Storage::computeHash(content);
         
         // Don't stage if unchanged from HEAD
-        if (headFiles.find(normFile) != headFiles.end() && headFiles[normFile] == hash) {
-            stagingArea.erase(normFile);
+        if (headFiles.find(normFile) != headFiles.end()) {
+            if (headFiles[normFile] == hash) {
+                stagingArea.erase(normFile);
+            } else {
+                Storage::storeObject(content);
+                stagingArea[normFile] = {StageOperation::OP_MODIFY, hash};
+            }
         } else {
             Storage::storeObject(content);
-            stagingArea[normFile] = hash;
+            stagingArea[normFile] = {StageOperation::OP_ADD, hash};
         }
     }
     
-    ofstream index(".vcs/index", ios::trunc);
-    for (auto &p : stagingArea) {
-        index << p.first << ":" << p.second << endl;
-    }
-    index.close();
+    Storage::writeIndex(stagingArea);
 }
 
 vector<FileChange> VCS::getModifiedFiles() {
@@ -504,38 +510,16 @@ StagingStatus VCS::getStagingStatus() {
     string current = Branch::getHeadCommit();
     unordered_map<string, string> headFiles;
     if (!current.empty()) {
-        Commit headCommit = Commit::getCommit(current);
-        headFiles = headCommit.files;
+        headFiles = Commit::getCommit(current).files;
     }
 
     auto stagingArea = Storage::readIndex();
-    
-    // 1. Calculate Staged Changes (HEAD vs Index)
-    for (const auto& p : stagingArea) {
-        string path = p.first;
-        string indexHash = p.second;
-        
-        if (indexHash == "") { // explicitly untracked/deleted in index
-            if (headFiles.find(path) != headFiles.end()) {
-                FileChange change; change.filename = path; change.status = "deleted";
-                change.oldHash = headFiles[path]; change.newHash = "";
-                status.staged.push_back(change);
-            }
-        } else {
-            if (headFiles.find(path) == headFiles.end()) {
-                FileChange change; change.filename = path; change.status = "added";
-                change.oldHash = ""; change.newHash = indexHash;
-                status.staged.push_back(change);
-            } else if (headFiles[path] != indexHash) {
-                FileChange change; change.filename = path; change.status = "modified";
-                change.oldHash = headFiles[path]; change.newHash = indexHash;
-                status.staged.push_back(change);
-            }
-        }
-    }
-    
-    // 2. Calculate Unstaged Changes and Untracked Files (Index/HEAD vs Working Tree)
-    unordered_set<string> wtFiles;
+    unordered_map<string, string> wtFiles;
+
+    set<string> allPaths;
+    for (const auto& p : headFiles) allPaths.insert(p.first);
+    for (const auto& p : stagingArea) allPaths.insert(p.first);
+
     try {
         for (auto it = fs::recursive_directory_iterator("."); it != fs::recursive_directory_iterator(); ++it) {
             if (it->is_directory()) {
@@ -546,63 +530,64 @@ StagingStatus VCS::getStagingStatus() {
                 }
             } else if (it->is_regular_file()) {
                 string path = normalizePath(it->path().string());
-                wtFiles.insert(path);
-                
                 ifstream file(path, ios::binary);
                 if (file) {
                     string content((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
-                    string hash = Storage::computeHash(content);
-                    
-                    string expectedHash = "";
-                    bool isTracked = false;
-                    
-                    if (stagingArea.find(path) != stagingArea.end() && stagingArea[path] != "") {
-                        expectedHash = stagingArea[path];
-                        isTracked = true;
-                    } else if (stagingArea.find(path) == stagingArea.end() && headFiles.find(path) != headFiles.end()) {
-                        expectedHash = headFiles[path];
-                        isTracked = true;
-                    }
-                    
-                    if (isTracked) {
-                        status.tracked.push_back(path);
-                        if (expectedHash != hash) {
-                            FileChange change; change.filename = path; change.status = "modified";
-                            change.oldHash = expectedHash; change.newHash = hash;
-                            status.unstaged.push_back(change);
-                        }
-                    } else {
-                        status.untracked.push_back(path);
-                    }
+                    wtFiles[path] = Storage::computeHash(content);
+                    allPaths.insert(path);
                 }
             }
         }
-    } catch (const fs::filesystem_error& e) {}
+    } catch (...) {}
 
-    // 3. Find Unstaged Deletions (Tracked files that are missing from Working Tree)
-    for (const auto& p : headFiles) {
-        string path = p.first;
-        if (stagingArea.find(path) != stagingArea.end() && stagingArea[path] == "") continue; // staged for deletion
-        
-        if (wtFiles.find(path) == wtFiles.end()) {
-            FileChange change; change.filename = path; change.status = "deleted";
-            change.oldHash = (stagingArea.find(path) != stagingArea.end() && stagingArea[path] != "") ? stagingArea[path] : p.second;
-            change.newHash = "";
-            status.unstaged.push_back(change);
-            status.tracked.push_back(path);
+    for (const string& path : allPaths) {
+        bool inHead = headFiles.count(path);
+        bool inIndex = stagingArea.count(path);
+        bool inWt = wtFiles.count(path);
+
+        string headHash = inHead ? headFiles[path] : "";
+        StageOperation indexOp = StageOperation::OP_MODIFY;
+        string indexHash = "";
+        if (inIndex) {
+            indexOp = stagingArea[path].operation;
+            indexHash = stagingArea[path].hash;
+        }
+        string wtHash = inWt ? wtFiles[path] : "";
+
+        if (inIndex) {
+            FileChange c; c.filename = path;
+            if (indexOp == StageOperation::OP_ADD) {
+                c.status = "added"; c.oldHash = ""; c.newHash = indexHash;
+            } else if (indexOp == StageOperation::OP_MODIFY) {
+                c.status = "modified"; c.oldHash = headHash; c.newHash = indexHash;
+            } else if (indexOp == StageOperation::OP_DELETE) {
+                c.status = "deleted"; c.oldHash = headHash; c.newHash = "";
+            }
+            status.staged.push_back(c);
+        }
+
+        if (!inHead && !inIndex && inWt) {
+            status.untracked.push_back(path);
+        } else {
+            if (inHead || (inIndex && indexOp != StageOperation::OP_DELETE)) {
+                status.tracked.push_back(path);
+            }
+
+            string currentExpectedHash = inIndex ? (indexOp == StageOperation::OP_DELETE ? "" : indexHash) : headHash;
+            bool expectExists = !currentExpectedHash.empty();
+
+            if (expectExists && inWt && wtHash != currentExpectedHash) {
+                FileChange c; c.filename = path; c.status = "modified";
+                c.oldHash = currentExpectedHash; c.newHash = wtHash;
+                status.unstaged.push_back(c);
+            } else if (expectExists && !inWt) {
+                FileChange c; c.filename = path; c.status = "deleted";
+                c.oldHash = currentExpectedHash; c.newHash = "";
+                status.unstaged.push_back(c);
+            }
         }
     }
-    for (const auto& p : stagingArea) {
-        string path = p.first;
-        if (p.second == "") continue; 
-        if (headFiles.find(path) == headFiles.end() && wtFiles.find(path) == wtFiles.end()) {
-             FileChange change; change.filename = path; change.status = "deleted";
-             change.oldHash = p.second; change.newHash = "";
-             status.unstaged.push_back(change);
-             status.tracked.push_back(path);
-        }
-    }
-    
+
     std::sort(status.tracked.begin(), status.tracked.end());
     status.tracked.erase(std::unique(status.tracked.begin(), status.tracked.end()), status.tracked.end());
 
