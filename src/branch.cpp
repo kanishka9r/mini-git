@@ -2,6 +2,7 @@
 #include <iostream>
 #include <sys/stat.h>
 #include <fstream>
+#include <filesystem>
 
 using namespace std;
 
@@ -12,8 +13,7 @@ void Branch::createBranch(const string& name){
 
     if (stat(path.c_str(), &st) == 0)
     {
-        cout << "Branch already exists" << endl;
-        return;
+        throw runtime_error("Branch already exists");
     }
 
     string currentBranch;
@@ -29,8 +29,7 @@ void Branch::createBranch(const string& name){
     }
 
     if (commitHash.empty()) {
-        cout << "Cannot create a branch before the first commit." << endl;
-        return;
+        throw runtime_error("Cannot create a branch before the first commit.");
     }
 
     ofstream newBranch(path);
@@ -72,6 +71,24 @@ void Branch::setCurrentBranch(const string &name)
     ofstream headFile(".vcs/HEAD");
     headFile << name;
     headFile.close();
+}
+
+vector<string> Branch::getAllBranches()
+{
+    vector<string> branches;
+    string path = ".vcs/refs";
+    
+    struct stat st;
+    if (stat(path.c_str(), &st) != 0) return branches;
+
+    // Use filesystem to list files in .vcs/refs/
+    for (const auto& entry : std::filesystem::directory_iterator(path)) {
+        if (entry.is_regular_file()) {
+            branches.push_back(entry.path().filename().string());
+        }
+    }
+    
+    return branches;
 }
 
 void Branch::updateBranch(const string &name, const string &hash)

@@ -10,6 +10,7 @@
 #include "branch.h"
 #include "graph.h"
 #include <queue>
+#include <algorithm>
 
 #include <filesystem>
 using namespace std;
@@ -64,39 +65,10 @@ void VCS::init()
 
 void VCS::add(const string &filename)
 {
-    // Repo check
-    struct stat st;
-    if (stat(".vcs", &st) != 0)
-    {
-        cout << "Repository not initialized!" << endl;
-        return;
-    }
-
-    string normFile = normalizePath(filename);
-    ifstream file(normFile, ios::binary);
-
-    auto stagingArea = Storage::readIndex();
-
-    if (!file)
-    {
-        stagingArea[normFile] = "";
-        cout << "Staged deletion for " + normFile << endl;
-    }
-    else
-    {
-        string content((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
-        const string hash = Storage::computeHash(content);
-        Storage::storeObject(content);
-        stagingArea[normFile] = hash;
-        cout << "Added " + normFile + " to staging" << endl;
-    }
-
-    ofstream index(".vcs/index", ios::trunc);
-    for (auto &p : stagingArea)
-    {
-        index << p.first << ":" << p.second << endl;
-    }
-    index.close();
+    addMultiple({filename});
+    
+    // Just for CLI output, assume it was processed
+    cout << "Processed " << filename << " for staging" << endl;
 }
 
 void VCS::commit(const string &message)
@@ -211,64 +183,82 @@ void VCS::logGraph()
 void VCS::checkout(const string &name)
 {
     struct stat st;
-
-    // Check repo exists
-    if (stat(".vcs", &st) != 0)
-    {
-        cout << "Repository not initialized\n";
-        return;
+    if (stat(".vcs", &st) != 0) {
+        throw runtime_error("Repository not initialized");
     }
 
-    // Safety check: Prevent destructive checkout
-    auto changes = getModifiedFiles();
-    if (!changes.empty()) {
-        cout << "error: Your local changes would be overwritten by checkout. Please commit or stash them.\n";
-        return;
-    }
-
-    // Check branch exists
     string refPath = ".vcs/refs/" + name;
-    if (stat(refPath.c_str(), &st) != 0)
-    {
-        cout << "Branch does not exist\n";
-        return;
+    if (stat(refPath.c_str(), &st) != 0) {
+        throw runtime_error("Branch does not exist");
     }
 
-    // Update HEAD  branch
-    ofstream headFile(".vcs/HEAD");
-    headFile << name;
-    headFile.close();
+    auto stagingArea = Storage::readIndex();
+    if (!stagingArea.empty()) {
+        throw runtime_error("You have staged changes. Please commit or stash them before checking out.");
+    }
 
-    //  Read commit hash from branch
+    string currentBranch = Branch::getCurrentBranch();
+    if (currentBranch == name) {
+        throw runtime_error("Already on branch " + name);
+    }
+
+    string currentHeadHash = Branch::getHeadCommit();
+    unordered_map<string, string> headFiles;
+    if (!currentHeadHash.empty()) {
+        headFiles = Commit::getCommit(currentHeadHash).files;
+    }
+
     ifstream refFile(refPath);
-    string commitHash;
-    getline(refFile, commitHash);
+    string targetCommitHash;
+    getline(refFile, targetCommitHash);
     refFile.close();
 
-    if (commitHash == "")
-    {
-        cout << "Branch has no commits\n";
-        return;
+    if (targetCommitHash == "") {
+        throw runtime_error("Branch has no commits");
     }
 
-    // Load commit snapshot 
-    Commit commit = Commit::getCommit(commitHash);
+    unordered_map<string, string> targetFiles = Commit::getCommit(targetCommitHash).files;
 
-    // Clean working directory
-    string currentHead = Branch::getHeadCommit();
-    if (!currentHead.empty()) {
-        Commit headCommit = Commit::getCommit(currentHead);
-        cleanWorkingDirectory(headCommit.files, commit.files);
+    // Safety check: Prevent destructive checkout
+    for (auto it = fs::recursive_directory_iterator("."); it != fs::recursive_directory_iterator(); ++it) {
+        if (it->is_directory()) {
+            string dirName = it->path().filename().string();
+            if (dirName == ".vcs" || dirName == ".git" || dirName == "build" || dirName == "client" || dirName == "node_modules") {
+                it.disable_recursion_pending();
+                continue;
+            }
+        } else if (it->is_regular_file()) {
+            string path = normalizePath(it->path().string());
+            ifstream file(path, ios::binary);
+            if (file) {
+                string content((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
+                string wtHash = Storage::computeHash(content);
+                
+                bool isUntracked = (headFiles.find(path) == headFiles.end());
+                bool isModified = (!isUntracked && headFiles[path] != wtHash);
+                
+                if (isUntracked || isModified) {
+                    if (targetFiles.find(path) != targetFiles.end()) {
+                        if (targetFiles[path] != wtHash) {
+                            throw runtime_error("Checkout would overwrite local changes in " + path);
+                        }
+                    } else if (isModified) {
+                        throw runtime_error("Checkout would delete local changes in " + path);
+                    }
+                }
+            }
+        }
     }
+
+    // Clean working directory (delete files tracked by HEAD but not by target branch)
+    cleanWorkingDirectory(headFiles, targetFiles);
 
     // Restore files
-    for (auto &it : commit.files)
-    {
+    for (auto &it : targetFiles) {
         const string &filename = it.first;
         const string &hash = it.second;
 
         string content = Storage::getObject(hash);
-
         fs::path p(filename);
         if (p.has_parent_path()) {
             fs::create_directories(p.parent_path());
@@ -278,6 +268,11 @@ void VCS::checkout(const string &name)
         out << content;
         out.close();
     }
+
+    // Update HEAD branch only after success
+    ofstream headFile(".vcs/HEAD");
+    headFile << name;
+    headFile.close();
 
     cout << "Switched to branch " << name << endl;
 }
@@ -339,13 +334,39 @@ string VCS::commitAndReturnHash(const string& message) {
     string parentHash = Branch::getHead(currentBranch);
     time_t now = time(0);
 
-    string raw = message + parentHash + to_string(now);
+    // Get parent commit files to inherit
+    unordered_map<string, string> treeFiles;
+    if (!parentHash.empty()) {
+        Commit parent = Commit::getCommit(parentHash);
+        treeFiles = parent.files;
+    }
+
+    // Apply staged changes to the tree
     for (auto &p : stagingArea) {
+        if (p.second == "") {
+            treeFiles.erase(p.first); // Deleted file
+        } else {
+            treeFiles[p.first] = p.second; // Added/Modified file
+        }
+    }
+
+    unordered_map<string, string> originalParentFiles;
+    if (!parentHash.empty()) {
+        originalParentFiles = Commit::getCommit(parentHash).files;
+    }
+    
+    if (treeFiles == originalParentFiles) {
+        throw runtime_error("Nothing to commit (empty commit)");
+    }
+
+    // Compute hash based on the entire new tree
+    string raw = message + parentHash + to_string(now);
+    for (auto &p : treeFiles) {
         raw += p.first + p.second;
     }
 
     string commitHash = Storage::computeHash(raw);
-    Commit::saveCommitRaw(commitHash, parentHash, now, message, stagingArea);
+    Commit::saveCommitRaw(commitHash, parentHash, now, message, treeFiles);
     Branch::updateHead(currentBranch, commitHash);
     Storage::clearIndex();
 
@@ -373,20 +394,36 @@ void VCS::addMultiple(const vector<string>& filenames) {
     if (!isInitialized()) return;
     
     auto stagingArea = Storage::readIndex();
+    string current = Branch::getHeadCommit();
+    unordered_map<string, string> headFiles;
+    if (!current.empty()) {
+        Commit headCommit = Commit::getCommit(current);
+        headFiles = headCommit.files;
+    }
     
     for (const string& filename : filenames) {
         string normFile = normalizePath(filename);
         ifstream file(normFile, ios::binary);
         if (!file) {
-            stagingArea[normFile] = "";
+            // If deleted, stage the deletion only if it exists in HEAD
+            if (headFiles.find(normFile) != headFiles.end()) {
+                stagingArea[normFile] = "";
+            } else {
+                stagingArea.erase(normFile);
+            }
             continue;
         }
         
         string content((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
         string hash = Storage::computeHash(content);
-        Storage::storeObject(content);
         
-        stagingArea[normFile] = hash;
+        // Don't stage if unchanged from HEAD
+        if (headFiles.find(normFile) != headFiles.end() && headFiles[normFile] == hash) {
+            stagingArea.erase(normFile);
+        } else {
+            Storage::storeObject(content);
+            stagingArea[normFile] = hash;
+        }
     }
     
     ofstream index(".vcs/index", ios::trunc);
@@ -458,4 +495,116 @@ vector<FileChange> VCS::getModifiedFiles() {
     }
     
     return changes;
+}
+
+StagingStatus VCS::getStagingStatus() {
+    StagingStatus status;
+    if (!isInitialized()) return status;
+
+    string current = Branch::getHeadCommit();
+    unordered_map<string, string> headFiles;
+    if (!current.empty()) {
+        Commit headCommit = Commit::getCommit(current);
+        headFiles = headCommit.files;
+    }
+
+    auto stagingArea = Storage::readIndex();
+    
+    // 1. Calculate Staged Changes (HEAD vs Index)
+    for (const auto& p : stagingArea) {
+        string path = p.first;
+        string indexHash = p.second;
+        
+        if (indexHash == "") { // explicitly untracked/deleted in index
+            if (headFiles.find(path) != headFiles.end()) {
+                FileChange change; change.filename = path; change.status = "deleted";
+                change.oldHash = headFiles[path]; change.newHash = "";
+                status.staged.push_back(change);
+            }
+        } else {
+            if (headFiles.find(path) == headFiles.end()) {
+                FileChange change; change.filename = path; change.status = "added";
+                change.oldHash = ""; change.newHash = indexHash;
+                status.staged.push_back(change);
+            } else if (headFiles[path] != indexHash) {
+                FileChange change; change.filename = path; change.status = "modified";
+                change.oldHash = headFiles[path]; change.newHash = indexHash;
+                status.staged.push_back(change);
+            }
+        }
+    }
+    
+    // 2. Calculate Unstaged Changes and Untracked Files (Index/HEAD vs Working Tree)
+    unordered_set<string> wtFiles;
+    try {
+        for (auto it = fs::recursive_directory_iterator("."); it != fs::recursive_directory_iterator(); ++it) {
+            if (it->is_directory()) {
+                string name = it->path().filename().string();
+                if (name == ".vcs" || name == ".git" || name == "build" || name == "client" || name == "node_modules") {
+                    it.disable_recursion_pending();
+                    continue;
+                }
+            } else if (it->is_regular_file()) {
+                string path = normalizePath(it->path().string());
+                wtFiles.insert(path);
+                
+                ifstream file(path, ios::binary);
+                if (file) {
+                    string content((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
+                    string hash = Storage::computeHash(content);
+                    
+                    string expectedHash = "";
+                    bool isTracked = false;
+                    
+                    if (stagingArea.find(path) != stagingArea.end() && stagingArea[path] != "") {
+                        expectedHash = stagingArea[path];
+                        isTracked = true;
+                    } else if (stagingArea.find(path) == stagingArea.end() && headFiles.find(path) != headFiles.end()) {
+                        expectedHash = headFiles[path];
+                        isTracked = true;
+                    }
+                    
+                    if (isTracked) {
+                        status.tracked.push_back(path);
+                        if (expectedHash != hash) {
+                            FileChange change; change.filename = path; change.status = "modified";
+                            change.oldHash = expectedHash; change.newHash = hash;
+                            status.unstaged.push_back(change);
+                        }
+                    } else {
+                        status.untracked.push_back(path);
+                    }
+                }
+            }
+        }
+    } catch (const fs::filesystem_error& e) {}
+
+    // 3. Find Unstaged Deletions (Tracked files that are missing from Working Tree)
+    for (const auto& p : headFiles) {
+        string path = p.first;
+        if (stagingArea.find(path) != stagingArea.end() && stagingArea[path] == "") continue; // staged for deletion
+        
+        if (wtFiles.find(path) == wtFiles.end()) {
+            FileChange change; change.filename = path; change.status = "deleted";
+            change.oldHash = (stagingArea.find(path) != stagingArea.end() && stagingArea[path] != "") ? stagingArea[path] : p.second;
+            change.newHash = "";
+            status.unstaged.push_back(change);
+            status.tracked.push_back(path);
+        }
+    }
+    for (const auto& p : stagingArea) {
+        string path = p.first;
+        if (p.second == "") continue; 
+        if (headFiles.find(path) == headFiles.end() && wtFiles.find(path) == wtFiles.end()) {
+             FileChange change; change.filename = path; change.status = "deleted";
+             change.oldHash = p.second; change.newHash = "";
+             status.unstaged.push_back(change);
+             status.tracked.push_back(path);
+        }
+    }
+    
+    std::sort(status.tracked.begin(), status.tracked.end());
+    status.tracked.erase(std::unique(status.tracked.begin(), status.tracked.end()), status.tracked.end());
+
+    return status;
 }

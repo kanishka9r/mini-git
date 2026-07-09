@@ -28,6 +28,7 @@ export default function SyncPage() {
           isSyncing, syncProgress, syncLogs, refreshStatus } = useStore();
 
   const [status, setStatus] = useState<{ msg: string; ok: boolean } | null>(null);
+  const [syncMode, setSyncMode] = useState<'push' | 'pull'>('push');
 
   function log(message: string, type: SyncLog['type'] = 'progress') {
     addSyncLog(message, type);
@@ -41,9 +42,10 @@ export default function SyncPage() {
     setSyncProgress(0);
     clearSyncLogs();
     setStatus(null);
+    setSyncMode('push');
 
     try {
-      log('Starting sync', 'info');
+      log('Starting push', 'info');
       setSyncProgress(10);
 
       log('Fetching local commits', 'progress');
@@ -97,14 +99,87 @@ export default function SyncPage() {
       }
       setSyncProgress(100);
 
-      log(`Sync complete! SHA: ${ghCommit.sha.substring(0, 8)}`, 'success');
-      setStatus({ msg: 'Successfully synced to GitHub', ok: true });
+      log(`Push complete! SHA: ${ghCommit.sha.substring(0, 8)}`, 'success');
+      setStatus({ msg: 'Successfully pushed to GitHub', ok: true });
       await refreshStatus();
 
     } catch (e) {
       const err = e as Error;
-      log(err.message || 'Sync failed', 'error');
-      setStatus({ msg: err.message || 'Sync failed', ok: false });
+      log(err.message || 'Push failed', 'error');
+      setStatus({ msg: err.message || 'Push failed', ok: false });
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function handlePull() {
+    if (!isLoggedIn) { setStatus({ msg: 'Not logged in. Please connect GitHub first.', ok: false }); return; }
+    if (!remoteOwner || !remoteRepo) { setStatus({ msg: 'No remote configured. Create a project first.', ok: false }); return; }
+
+    setSyncing(true);
+    setSyncProgress(0);
+    clearSyncLogs();
+    setStatus(null);
+    setSyncMode('pull');
+
+    try {
+      log('Starting pull', 'info');
+      setSyncProgress(10);
+      
+      const branch = currentBranch || 'main';
+      log(`Checking remote branch: ${branch}`, 'progress');
+      const remoteRef = await githubClient.getRef(token, remoteOwner, remoteRepo, branch);
+      
+      if (!remoteRef) {
+        log('Remote branch not found.', 'error');
+        setStatus({ msg: 'Remote branch not found.', ok: false });
+        return;
+      }
+      setSyncProgress(30);
+
+      log('Fetching tree', 'info');
+      const tree = await githubClient.getTree(token, remoteOwner, remoteRepo, remoteRef.object.sha);
+      
+      const blobs = tree.tree.filter((item: any) => item.type === 'blob');
+      setSyncProgress(40);
+      
+      log(`Found ${blobs.length} files to pull`, 'info');
+      
+      let conflicts = 0;
+      for (let i = 0; i < blobs.length; i++) {
+        const item = blobs[i];
+        log(`Downloading: ${item.path}`, 'progress');
+        const content = await githubClient.getBlob(token, remoteOwner, remoteRepo, item.sha);
+        
+        try {
+          await vcsClient.pullFile(item.path, content);
+          log(`Pulled: ${item.path}`, 'success');
+        } catch (err: any) {
+          if (err.message && err.message.includes('Conflict')) {
+            conflicts++;
+            log(`Conflict: ${item.path}`, 'error');
+          } else {
+            throw err;
+          }
+        }
+        
+        const pct = 40 + Math.round(((i + 1) / blobs.length) * 60);
+        setSyncProgress(pct);
+      }
+      
+      if (conflicts > 0) {
+        log(`Pull completed with ${conflicts} conflict(s).`, 'error');
+        setStatus({ msg: `Pulled with ${conflicts} conflict(s). Check files ending with .local and .remote`, ok: false });
+      } else {
+        log('Pull complete!', 'success');
+        setStatus({ msg: 'Successfully pulled from GitHub', ok: true });
+      }
+      await refreshStatus();
+      
+    } catch (e) {
+      const err = e as Error;
+      log(err.message || 'Pull failed', 'error');
+      setStatus({ msg: err.message || 'Pull failed', ok: false });
     } finally {
       setSyncing(false);
     }
@@ -114,7 +189,7 @@ export default function SyncPage() {
     <div className="max-w-3xl mx-auto px-8 py-8 animate-fade-in space-y-8">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-text-primary">Sync</h1>
-        <p className="text-text-secondary mt-1 text-sm">Push your repository to GitHub</p>
+        <p className="text-text-secondary mt-1 text-sm">Push or pull your repository with GitHub</p>
       </div>
 
       <div className="card">
@@ -122,18 +197,29 @@ export default function SyncPage() {
           <div className={`w-20 h-20 rounded-lg flex items-center justify-center text-lg font-extrabold transition-all duration-300 border ${
             isSyncing ? 'bg-accent-blue/10 border-accent-blue/20 text-accent-blue animate-pulse' : 'bg-bg-tertiary border-border text-accent-blue'
           }`}>
-            {isSyncing ? 'SYNC' : syncProgress === 100 ? 'DONE' : 'PUSH'}
+            {isSyncing ? (syncMode === 'push' ? 'PUSHING' : 'PULLING') : syncProgress === 100 ? 'DONE' : 'SYNC'}
           </div>
 
-          <button
-            onClick={handleSync}
-            disabled={isSyncing}
-            className={`px-10 py-3 font-semibold rounded-lg text-white text-sm transition-all duration-300 cursor-pointer disabled:cursor-not-allowed ${
-              isSyncing ? 'bg-bg-tertiary text-text-muted' : 'bg-btn-blue hover:bg-btn-blue-hover shadow-sm'
-            }`}
-          >
-            {isSyncing ? 'Syncing' : 'Sync Now'}
-          </button>
+          <div className="flex gap-4">
+            <button
+              onClick={handlePull}
+              disabled={isSyncing}
+              className={`px-10 py-3 font-semibold rounded-lg text-text-primary text-sm transition-all duration-300 cursor-pointer disabled:cursor-not-allowed border ${
+                isSyncing ? 'bg-bg-tertiary border-border text-text-muted opacity-50' : 'bg-bg-secondary border-border hover:bg-bg-tertiary shadow-sm'
+              }`}
+            >
+              Pull
+            </button>
+            <button
+              onClick={handleSync}
+              disabled={isSyncing}
+              className={`px-10 py-3 font-semibold rounded-lg text-white text-sm transition-all duration-300 cursor-pointer disabled:cursor-not-allowed ${
+                isSyncing ? 'bg-bg-tertiary text-text-muted opacity-50' : 'bg-btn-blue hover:bg-btn-blue-hover shadow-sm'
+              }`}
+            >
+              Push
+            </button>
+          </div>
 
           {(isSyncing || syncProgress > 0) && (
             <div className="w-full max-w-sm space-y-2 animate-fade-in-fast">
@@ -181,3 +267,4 @@ export default function SyncPage() {
     </div>
   );
 }
+

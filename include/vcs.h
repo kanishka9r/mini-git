@@ -15,6 +15,13 @@ struct FileChange {
     string newHash;
 };
 
+struct StagingStatus {
+    vector<FileChange> staged;
+    vector<FileChange> unstaged;
+    vector<string> untracked;
+    vector<string> tracked;
+};
+
 class VCS {
 public:
     static string normalizePath(string path);
@@ -35,6 +42,7 @@ public:
     static string commitAndReturnHash(const string& message);
     static vector<Commit> getCommitHistory();
     static vector<FileChange> getModifiedFiles();
+    static StagingStatus getStagingStatus();
     static bool isInitialized();
     static void addMultiple(const vector<string>& filenames);
 };
