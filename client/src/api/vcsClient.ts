@@ -9,6 +9,7 @@ import type {
   ConfigResponse,
   RevertResponse,
   ObjectResponse,
+  StagingStatusResponse,
 } from '../types';
 
 const API_BASE = import.meta.env.DEV ? '/api' : 'http://localhost:8080/api';
@@ -53,11 +54,14 @@ export const vcsClient = {
     }),
   log: () => request<CommitEntry[]>('/log'),
   changes: () => request<FileChange[]>('/changes'),
+  stagingStatus: () => request<StagingStatusResponse>('/staging-status'),
   diff: (oldHash: string, filename: string) =>
     request<DiffLine[]>('/diff', {
       method: 'POST',
       body: JSON.stringify({ oldHash, filename }),
     }),
+  branches: () =>
+    request<{ current: string; branches: string[] }>('/branches'),
   branch: (name: string) =>
     request<{ success: boolean }>('/branch', {
       method: 'POST',
@@ -67,6 +71,21 @@ export const vcsClient = {
     request<{ success: boolean }>('/checkout', {
       method: 'POST',
       body: JSON.stringify({ name }),
+    }),
+  unstage: (filename: string) =>
+    request<{ success: boolean }>('/unstage', {
+      method: 'POST',
+      body: JSON.stringify({ filename }),
+    }),
+  untrack: (filename: string) =>
+    request<{ success: boolean }>('/untrack', {
+      method: 'POST',
+      body: JSON.stringify({ filename }),
+    }),
+  pullFile: (path: string, content: string) =>
+    request<{ success: boolean; message: string; conflict?: boolean }>('/pull-file', {
+      method: 'POST',
+      body: JSON.stringify({ path, content: JSON.stringify(content) }),
     }),
   config: () => request<ConfigResponse>('/config'),
   setConfig: (key: string, value: string) =>

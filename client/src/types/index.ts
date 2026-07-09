@@ -41,6 +41,13 @@ export interface DiffLine {
   text: string;
 }
 
+export interface StagingStatusResponse {
+  staged: FileChange[];
+  unstaged: FileChange[];
+  untracked: string[];
+  tracked: string[];
+}
+
 export interface ConfigResponse {
   token: string;
   username: string;

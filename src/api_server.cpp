@@ -265,6 +265,29 @@ void ApiServer::start(int port)
         res.set_content(json, "application/json");
     });
 
+    // GET /api/branches
+    svr.Get("/api/branches", [](const httplib::Request&, httplib::Response& res) {
+        if (!VCS::isInitialized()) {
+            res.set_content("{\"current\":\"\", \"branches\":[]}", "application/json");
+            return;
+        }
+
+        string current = Branch::getCurrentBranch();
+        vector<string> branches = Branch::getAllBranches();
+
+        string json = "{";
+        json += "\"current\":\"" + jsonEscape(current) + "\",";
+        json += "\"branches\":[";
+        for (size_t i = 0; i < branches.size(); ++i) {
+            json += "\"" + jsonEscape(branches[i]) + "\"";
+            if (i < branches.size() - 1) json += ",";
+        }
+        json += "]";
+        json += "}";
+
+        res.set_content(json, "application/json");
+    });
+
     //  POST /api/init 
     svr.Post("/api/init", [](const httplib::Request&, httplib::Response& res) {
         if (VCS::isInitialized())
@@ -322,6 +345,56 @@ void ApiServer::start(int port)
         }
 
         res.set_content("{\"success\":true,\"hash\":\"" + jsonEscape(hash) + "\"}", "application/json");
+    });
+
+    svr.Get("/api/staging-status", [](const httplib::Request& req, httplib::Response& res) {
+        try {
+            StagingStatus status = VCS::getStagingStatus();
+            string json = "{";
+            
+            json += "\"staged\":[";
+            for (size_t i = 0; i < status.staged.size(); ++i) {
+                const auto& c = status.staged[i];
+                json += "{\"filename\":\"" + jsonEscape(c.filename) + "\",";
+                json += "\"status\":\"" + c.status + "\",";
+                json += "\"oldHash\":\"" + jsonEscape(c.oldHash) + "\",";
+                json += "\"newHash\":\"" + jsonEscape(c.newHash) + "\"}";
+                if (i < status.staged.size() - 1) json += ",";
+            }
+            json += "],";
+            
+            json += "\"unstaged\":[";
+            for (size_t i = 0; i < status.unstaged.size(); ++i) {
+                const auto& c = status.unstaged[i];
+                json += "{\"filename\":\"" + jsonEscape(c.filename) + "\",";
+                json += "\"status\":\"" + c.status + "\",";
+                json += "\"oldHash\":\"" + jsonEscape(c.oldHash) + "\",";
+                json += "\"newHash\":\"" + jsonEscape(c.newHash) + "\"}";
+                if (i < status.unstaged.size() - 1) json += ",";
+            }
+            json += "],";
+            
+            json += "\"untracked\":[";
+            for (size_t i = 0; i < status.untracked.size(); ++i) {
+                json += "\"" + jsonEscape(status.untracked[i]) + "\"";
+                if (i < status.untracked.size() - 1) json += ",";
+            }
+            json += "],";
+            
+            json += "\"tracked\":[";
+            for (size_t i = 0; i < status.tracked.size(); ++i) {
+                json += "\"" + jsonEscape(status.tracked[i]) + "\"";
+                if (i < status.tracked.size() - 1) json += ",";
+            }
+            json += "]";
+            
+            json += "}";
+            
+            res.set_content(json, "application/json");
+        } catch (const exception& e) {
+            res.status = 500;
+            res.set_content("{\"error\":\"" + jsonEscape(e.what()) + "\"}", "application/json");
+        }
     });
 
     //  GET /api/log 
@@ -435,8 +508,13 @@ void ApiServer::start(int port)
             return;
         }
 
-        VCS::branch(params["name"]);
-        res.set_content("{\"success\":true}", "application/json");
+        try {
+            VCS::branch(params["name"]);
+            res.set_content("{\"success\":true}", "application/json");
+        } catch (const exception& e) {
+            res.status = 500;
+            res.set_content("{\"success\":false,\"message\":\"" + jsonEscape(string(e.what())) + "\"}", "application/json");
+        }
     });
 
     //  POST /api/checkout 
@@ -450,7 +528,42 @@ void ApiServer::start(int port)
             return;
         }
 
-        VCS::checkout(params["name"]);
+        try {
+            VCS::checkout(params["name"]);
+            res.set_content("{\"success\":true}", "application/json");
+        } catch (const exception& e) {
+            res.status = 500;
+            res.set_content("{\"success\":false,\"message\":\"" + jsonEscape(string(e.what())) + "\"}", "application/json");
+        }
+    });
+
+    //  POST /api/unstage 
+    svr.Post("/api/unstage", [](const httplib::Request& req, httplib::Response& res) {
+        auto params = parseJson(req.body);
+
+        if (params.find("filename") == params.end() || params["filename"].empty())
+        {
+            res.status = 400;
+            res.set_content("{\"success\":false,\"message\":\"Missing filename\"}", "application/json");
+            return;
+        }
+
+        VCS::unstage(params["filename"]);
+        res.set_content("{\"success\":true}", "application/json");
+    });
+
+    //  POST /api/untrack 
+    svr.Post("/api/untrack", [](const httplib::Request& req, httplib::Response& res) {
+        auto params = parseJson(req.body);
+
+        if (params.find("filename") == params.end() || params["filename"].empty())
+        {
+            res.status = 400;
+            res.set_content("{\"success\":false,\"message\":\"Missing filename\"}", "application/json");
+            return;
+        }
+
+        VCS::untrack(params["filename"]);
         res.set_content("{\"success\":true}", "application/json");
     });
 
