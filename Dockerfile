@@ -1,5 +1,5 @@
 # Build stage
-FROM gcc:12-bullseye as builder
+FROM gcc:12-bookworm as builder
 WORKDIR /app
 
 # Copy headers and source code
@@ -12,7 +12,7 @@ COPY libs/ ./libs/
 RUN g++ -std=c++17 src/*.cpp -I include -I libs -o vcs_server -pthread
 
 # Production stage
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 WORKDIR /app
 
 # Install git and bash (useful for debugging, though mini-git implements its own engine)
