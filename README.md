@@ -9,9 +9,9 @@ It operates as a fully standalone portable desktop application. The C++ engine h
 ## Features
 
 **C++ Backend**
-- **Content-Addressed Blob Storage:** Files are stored as hashed objects inside `.vcs/objects/`, with automatic deduplication — identical content is stored only once.
-- **Staging Area & Commits:** A `.vcs/index` file tracks staged files. Each commit records the parent hash, timestamp, message, and the complete file-to-hash mapping, persisted in `.vcs/commits/`.
-- **Branching & Safe Checkout:** Branches are stored as pointer files in `.vcs/refs/`. Checkout restores the working directory to match the target branch's snapshot and blocks switching if there are unsaved local changes.
+- **Content-Addressed Blob Storage:** Files are stored as hashed objects internally, with automatic deduplication — identical content is stored only once.
+- **Staging Area & Commits:** A staging index tracks modified files. Each commit records the parent hash, timestamp, message, and the complete file-to-hash mapping, persisted securely.
+- **Branching & Safe Checkout:** Branches are stored as pointer files. Checkout restores the working directory to match the target branch's snapshot and blocks switching if there are unsaved local changes.
 - **LCS Diff Engine:** Line-level differences are calculated using a custom Longest Common Subsequence (LCS) dynamic programming algorithm, optimized with prefix/suffix pruning to reduce unnecessary comparisons.
 - **Embedded REST Server:** Uses `cpp-httplib` to serve all VCS operations as JSON endpoints and static files on port 8080, with a custom JSON parser (no external dependency).
 - **Cross-Platform & Portable:** Distributed via GitHub Actions as a single standalone executable for Windows, macOS, and Linux. No installation or dependencies required.
@@ -45,17 +45,17 @@ It operates as a fully standalone portable desktop application. The C++ engine h
 ## Requirements
 
 ### For End-Users
-**None** You do not need to install Node.js, C++, or any external dependencies. Just download the pre-compiled application from the Releases tab.
+- **None:** You do not need to install Node.js, C++, or any external dependencies. Just download the pre-compiled application from the Releases tab.
 
 ### For Developers (If modifying the code)
-**Backend:**
-- C++17 compatible compiler (`g++` or `clang++`)
-- Windows: MSYS2 MinGW-w64 (or similar)
-- macOS / Linux: `make` and `g++`
+- **Backend:**
+  - C++17 compatible compiler (`g++` or `clang++`)
+  - Windows: MSYS2 MinGW-w64 (or similar)
+  - macOS / Linux: `make` and `g++`
 
-**Frontend:**
-- Node.js v20 or higher
-- npm (comes bundled with Node.js)
+- **Frontend:**
+  - Node.js v20 or higher
+  - npm (comes bundled with Node.js)
 
 ---
 
@@ -71,18 +71,18 @@ It operates as a fully standalone portable desktop application. The C++ engine h
 ### 2. For Developers (Building from Source)
 If you want to modify the source code, you must build both the frontend and backend locally:
 
-**Build the Frontend:**
+1. **Build the Frontend:**
 ```bash
 cd client
 npm install
 npm run build
 ```
 
-**Build the Backend:**
+2. **Build the Backend:**
 - **On Windows:** Run `.\build.bat`
 - **On Mac/Linux:** Run `make`
 
-**Start the App:**
+3. **Start the App:**
 Run the compiled executable:
 - **Windows:** `.\vcs.exe`
 - **Mac/Linux:** `./vcs`
