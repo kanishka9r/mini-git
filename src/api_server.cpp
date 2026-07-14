@@ -767,6 +767,6 @@ void ApiServer::start(int port)
     cout << "  ------------------------------------------\n";
     cout << "\n";
 
-    svr.listen("localhost", port);
+    svr.listen("0.0.0.0", port);
 }
 
