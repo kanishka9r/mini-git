@@ -11,7 +11,7 @@
 #include <fstream>
 #include <sstream>
 #include <sys/stat.h>
-#include <direct.h>
+
 #include <filesystem>
 
 using namespace std;

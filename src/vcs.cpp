@@ -1,7 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <set>
-#include <direct.h>
+
 #include <sys/stat.h>
 #include <time.h>
 #include "vcs.h"
@@ -48,10 +48,10 @@ void VCS::init()
         return;
     }
 
-    _mkdir(".vcs");
-    _mkdir(".vcs/objects");
-    _mkdir(".vcs/commits");
-    _mkdir(".vcs/refs");
+    fs::create_directory(".vcs");
+    fs::create_directory(".vcs/objects");
+    fs::create_directory(".vcs/commits");
+    fs::create_directory(".vcs/refs");
 
     ofstream indexFile(".vcs/index");
     indexFile.close();
