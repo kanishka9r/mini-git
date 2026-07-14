@@ -12,8 +12,8 @@ import type {
   StagingStatusResponse,
 } from '../types';
 
-const API_BASE = import.meta.env.DEV ? '/api' : 'http://localhost:8080/api';
-
+// Use the Vercel env variable if available, otherwise use localhost for local development
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { 'Content-Type': 'application/json' },
