@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cstdlib>
 #include "storage.h"
 #include "vcs.h"
 #include "diff.h"
