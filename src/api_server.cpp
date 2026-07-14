@@ -468,10 +468,14 @@ void ApiServer::start(int port)
             oldContent = Storage::getObject(params["oldHash"]);
         }
 
-        // Get new content either from request body or from file
+        // Get new content either from request body, from hash, or from file
         if (params.find("newContent") != params.end())
         {
             newContent = params["newContent"];
+        }
+        else if (params.find("newHash") != params.end() && !params["newHash"].empty())
+        {
+            newContent = Storage::getObject(params["newHash"]);
         }
         else if (params.find("filename") != params.end())
         {

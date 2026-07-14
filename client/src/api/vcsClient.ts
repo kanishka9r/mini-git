@@ -55,10 +55,10 @@ export const vcsClient = {
   log: () => request<CommitEntry[]>('/log'),
   changes: () => request<FileChange[]>('/changes'),
   stagingStatus: () => request<StagingStatusResponse>('/staging-status'),
-  diff: (oldHash: string, filename: string) =>
+  diff: (oldHash: string, opts: { filename?: string, newHash?: string }) =>
     request<DiffLine[]>('/diff', {
       method: 'POST',
-      body: JSON.stringify({ oldHash, filename }),
+      body: JSON.stringify({ oldHash, ...opts }),
     }),
   branches: () =>
     request<{ current: string; branches: string[] }>('/branches'),

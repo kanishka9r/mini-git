@@ -2,7 +2,7 @@
 
 A full-stack, Git-like version control system built entirely from scratch in C++ with a React web interface.
 
-The backend is a lightweight VCS engine that handles most of the core version control operations and exposes them through a local REST API. The frontend is a React web application that connects to it, providing a fully visual interface for managing your repository without needing to memorize or type any version control commands.
+It operates as a fully standalone portable desktop application. The C++ engine handles the core version control operations and simultaneously serves the compiled React UI. Simply run the executable to manage your local repositories via a beautiful web interface, without needing to type any git commands.
 
 ---
 
@@ -13,7 +13,8 @@ The backend is a lightweight VCS engine that handles most of the core version co
 - **Staging Area & Commits:** A `.vcs/index` file tracks staged files. Each commit records the parent hash, timestamp, message, and the complete file-to-hash mapping, persisted in `.vcs/commits/`.
 - **Branching & Safe Checkout:** Branches are stored as pointer files in `.vcs/refs/`. Checkout restores the working directory to match the target branch's snapshot and blocks switching if there are unsaved local changes.
 - **LCS Diff Engine:** Line-level differences are calculated using a custom Longest Common Subsequence (LCS) dynamic programming algorithm, optimized with prefix/suffix pruning to reduce unnecessary comparisons.
-- **Embedded REST Server:** Uses `cpp-httplib` to serve all VCS operations as JSON endpoints on port 8080, with a custom JSON parser (no external dependency) and full CORS support for browser access.
+- **Embedded REST Server:** Uses `cpp-httplib` to serve all VCS operations as JSON endpoints and static files on port 8080, with a custom JSON parser (no external dependency).
+- **Cross-Platform & Portable:** Distributed via GitHub Actions as a single standalone executable for Windows, macOS, and Linux. No installation or dependencies required.
 
 **React Frontend**
 - **Workspace & User Setup:** Configure the active project folder, set your username and email for commits, and connect a GitHub Personal Access Token to enable remote repository operations.
@@ -26,9 +27,10 @@ The backend is a lightweight VCS engine that handles most of the core version co
 
 ## Tech Stack
 
-**Backend**
+**Backend & Distribution**
 - C++17 (Core VCS engine)
 - `cpp-httplib` (Single-header HTTP server library)
+- GitHub Actions (Automated multi-OS CI/CD release pipeline)
 
 **Frontend**
 - React 19 + TypeScript
@@ -42,59 +44,57 @@ The backend is a lightweight VCS engine that handles most of the core version co
 
 ## Requirements
 
-**Backend**
-- MSYS2 MinGW-w64 (includes `g++` compiler with C++17 support) — https://www.msys2.org/
-- Windows OS (the build script uses Windows-specific APIs)
+### For End-Users
+**None** You do not need to install Node.js, C++, or any external dependencies. Just download the pre-compiled application from the Releases tab.
 
-**Frontend**
-- Node.js v18 or higher — https://nodejs.org/
+### For Developers (If modifying the code)
+**Backend:**
+- C++17 compatible compiler (`g++` or `clang++`)
+- Windows: MSYS2 MinGW-w64 (or similar)
+- macOS / Linux: `make` and `g++`
+
+**Frontend:**
+- Node.js v20 or higher
 - npm (comes bundled with Node.js)
-
-npm Packages (installed automatically via `npm install`):
-- `react` v19
-- `react-dom` v19
-- `react-router-dom` v7
-- `zustand` v5
-- `tailwindcss` v4
-- `typescript` v6
-- `vite` v8
-- `@vitejs/plugin-react`
-- `@tailwindcss/vite`
-- `eslint` + related plugins (dev only)
 
 ---
 
 ## How to Run
 
-### 1. Build the Backend
-Run the build script from the root directory:
-```cmd
-.\build.bat
-```
-This compiles all C++ source files and produces `vcs.exe` in the root folder.
+### 1. For End-Users (The Easy Way)
+1. Go to the **Releases** tab on GitHub.
+2. Download the ZIP file for your operating system (Windows, Mac, or Linux).
+3. Unzip the folder.
+4. Double-click the executable (`vcs.exe` on Windows, or `vcs` on Mac/Linux).
+5. The application will start and your default web browser will automatically open to `http://localhost:8080`!
 
-### 2. Start the API Server
-Run the executable to start the local HTTP server on port 8080:
-```cmd
-.\vcs.exe serve 8080
-```
-The server must stay running while you use the frontend. It manages all reads and writes to your local `.vcs` repository.
+### 2. For Developers (Building from Source)
+If you want to modify the source code, you must build both the frontend and backend locally:
 
-### 3. Start the Frontend
-Navigate to the client folder and install the required packages :
-```cmd
+**Build the Frontend:**
+```bash
 cd client
 npm install
-npm run dev
+npm run build
 ```
-Open `http://localhost:5173` in your browser.
+*(This bundles the React code into `client/dist` so the C++ server can serve it).*
+
+**Build the Backend:**
+- **On Windows:** Run `.\build.bat`
+- **On Mac/Linux:** Run `make`
+
+**Start the App:**
+Run the compiled executable:
+- **Windows:** `.\vcs.exe`
+- **Mac/Linux:** `./vcs`
 
 ---
 
 ## CLI Reference
 
-The compiled executable also supports a direct command-line interface:
+The compiled executable defaults to the GUI web-server mode when run without arguments, but it also supports a direct command-line interface:
 
+- `vcs` - Starts the API server and auto-opens the web GUI on `localhost:8080`.
 - `vcs init` – Initialize an empty repository in the current directory.
 - `vcs add <file>` – Stage a file for the next commit.
 - `vcs unstage <file>` – Remove a file from the staging index.
@@ -111,7 +111,7 @@ The compiled executable also supports a direct command-line interface:
 
 ## API Endpoints
 
-All endpoints are served on `http://localhost:8080` (backend must be running locally).
+All endpoints are served on `http://localhost:8080` when the backend is running.
 
 - `GET /api/status` – Check if the workspace is an initialized VCS repository.
 - `POST /api/workspace` – Set the server's active working directory.
@@ -135,5 +135,4 @@ All endpoints are served on `http://localhost:8080` (backend must be running loc
 - **Merge Support:** Implement a three-way merge algorithm to combine diverged branches.
 - **Conflict Resolution:** Detect and highlight merge conflicts, allowing users to manually resolve them before committing.
 - **Clone Support:** Clone an existing local or remote repository into a new directory.
-- **Cross-Platform Build:** Replace Windows-specific APIs with portable alternatives to support Linux and macOS.
 - **Stash:** Temporarily shelve local changes without committing, and restore them later.

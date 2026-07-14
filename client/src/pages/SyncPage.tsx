@@ -105,8 +105,12 @@ export default function SyncPage() {
 
     } catch (e) {
       const err = e as Error;
-      log(err.message || 'Push failed', 'error');
-      setStatus({ msg: err.message || 'Push failed', ok: false });
+      let errorMsg = err.message || 'Push failed';
+      if (errorMsg.includes('422') || errorMsg.toLowerCase().includes('fast forward')) {
+        errorMsg = 'Coworkers have pushed new code! Please pull their changes first.';
+      }
+      log(errorMsg, 'error');
+      setStatus({ msg: errorMsg, ok: false });
     } finally {
       setSyncing(false);
     }

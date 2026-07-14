@@ -76,7 +76,7 @@ export const githubClient = {
   updateRef: (token: string, owner: string, repo: string, branch: string, sha: string) =>
     ghRequest<GitHubRef>(`${GH_API}/repos/${owner}/${repo}/git/refs/heads/${branch}`, token, {
       method: 'PATCH',
-      body: JSON.stringify({ sha, force: true }),
+      body: JSON.stringify({ sha, force: false }),
     }),
   createRef: (token: string, owner: string, repo: string, branch: string, sha: string) =>
     ghRequest<GitHubRef>(`${GH_API}/repos/${owner}/${repo}/git/refs`, token, {

@@ -256,21 +256,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Recent commits preview */}
-              {recentCommits.length > 0 && (
-                <div>
-                  <p className="text-xs text-text-muted font-semibold uppercase tracking-wider mb-2">Latest Activity</p>
-                  <div className="space-y-1.5">
-                    {recentCommits.slice(0, 3).map((c, i) => (
-                      <div key={c.hash} className="flex items-center gap-2.5 px-3 py-2 bg-bg-primary border border-border rounded-lg">
-                        <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${i === 0 ? 'bg-accent-green' : 'bg-border'}`} />
-                        <span className="text-text-primary text-xs font-medium truncate flex-1">{c.message}</span>
-                        <span className="text-text-muted font-mono text-xs flex-shrink-0">{c.hash.substring(0, 7)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* Latest activity removed per user request */}
             </div>
           )}
         </div>

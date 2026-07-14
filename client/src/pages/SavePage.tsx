@@ -75,7 +75,7 @@ export default function SavePage() {
 
   async function handleFileClick(filename: string, oldHash: string, section: SectionKey) {
     setSelectedFile(filename); setSelectedSection(section); setDiffLines([]);
-    try { setDiffLines(await vcsClient.diff(oldHash, filename)); } catch { setDiffLines([]); }
+    try { setDiffLines(await vcsClient.diff(oldHash, { filename })); } catch { setDiffLines([]); }
   }
 
   async function runOp(fn: () => Promise<any>, successMsg?: string) {
