@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { vcsClient } from '../api/vcsClient';
 import { useStore } from '../store/useStore';
-import type { FileChange, DiffLine, StagingStatusResponse } from '../types';
+import type { DiffLine, StagingStatusResponse } from '../types';
 
 // ─── Diff Viewer ─────────────────────────────────────────────────────────────
 function DiffViewer({ lines }: { lines: DiffLine[] }) {
@@ -78,7 +78,7 @@ export default function SavePage() {
     try { setDiffLines(await vcsClient.diff(oldHash, filename)); } catch { setDiffLines([]); }
   }
 
-  async function runOp(fn: () => Promise<void>, successMsg?: string) {
+  async function runOp(fn: () => Promise<any>, successMsg?: string) {
     setOpStatus(null);
     try {
       await fn();
