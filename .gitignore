@@ -1,9 +1,27 @@
+# Build artifacts
 vcs.exe
+vcs
+*.o
+*.obj
+*.pdb
+release/
+
+# Test files and scratchpads
+test_json.exe
+test_json.cpp
+netstat.txt
+benchmark.ps1
+commands.md
+test.txt
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Dependencies
 .vcs/
 client/node_modules/
 client/dist/
-client/.vite/
 .vscode/
 .env
 *.log
-benchmark.ps1
