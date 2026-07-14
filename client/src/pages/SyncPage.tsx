@@ -60,7 +60,20 @@ export default function SyncPage() {
       setSyncProgress(20);
 
       log('Checking remote branch', 'progress');
-      const remoteRef = await githubClient.getRef(token, remoteOwner, remoteRepo, currentBranch || 'main');
+      const branch = currentBranch || 'main';
+      const remoteRef = await githubClient.getRef(token, remoteOwner, remoteRepo, branch);
+      
+      const branchKey = `mg_last_sync_${remoteOwner}_${remoteRepo}_${branch}`;
+      const lastSyncedSha = localStorage.getItem(branchKey);
+      
+      if (remoteRef) {
+        if (!lastSyncedSha || remoteRef.object.sha !== lastSyncedSha) {
+          log('Coworkers have pushed new code! Please pull their changes first.', 'error');
+          setStatus({ msg: 'Coworkers have pushed new code! Please pull their changes first.', ok: false });
+          setSyncing(false);
+          return;
+        }
+      }
       setSyncProgress(30);
 
       log('Uploading files', 'info');
@@ -91,12 +104,13 @@ export default function SyncPage() {
       setSyncProgress(85);
 
       log('Updating remote branch', 'info');
-      const branch = currentBranch || 'main';
+      const pushBranch = currentBranch || 'main';
       if (remoteRef) {
-        await githubClient.updateRef(token, remoteOwner, remoteRepo, branch, ghCommit.sha);
+        await githubClient.updateRef(token, remoteOwner, remoteRepo, pushBranch, ghCommit.sha);
       } else {
-        await githubClient.createRef(token, remoteOwner, remoteRepo, branch, ghCommit.sha);
+        await githubClient.createRef(token, remoteOwner, remoteRepo, pushBranch, ghCommit.sha);
       }
+      localStorage.setItem(`mg_last_sync_${remoteOwner}_${remoteRepo}_${pushBranch}`, ghCommit.sha);
       setSyncProgress(100);
 
       log(`Push complete! SHA: ${ghCommit.sha.substring(0, 8)}`, 'success');
@@ -177,6 +191,7 @@ export default function SyncPage() {
       } else {
         log('Pull complete!', 'success');
         setStatus({ msg: 'Successfully pulled from GitHub', ok: true });
+        localStorage.setItem(`mg_last_sync_${remoteOwner}_${remoteRepo}_${branch}`, remoteRef.object.sha);
       }
       await refreshStatus();
       

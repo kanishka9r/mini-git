@@ -2,7 +2,7 @@
 
 A full-stack, Git-like version control system built entirely from scratch in C++ with a React web interface.
 
-It operates as a fully standalone portable desktop application. The C++ engine handles the core version control operations and simultaneously serves the compiled React UI. Simply run the executable to manage your local repositories via a beautiful web interface, without needing to type any git commands.
+It operates as a fully standalone portable desktop application. The C++ engine handles the core version control operations and simultaneously serves the compiled React UI. Simply run the executable to manage your local repositories using a beautiful web interface, without needing to type any git commands.
 
 ---
 
@@ -61,7 +61,7 @@ It operates as a fully standalone portable desktop application. The C++ engine h
 
 ## How to Run
 
-### 1. For End-Users (The Easy Way)
+### 1. For End-Users
 1. Go to the **Releases** tab on GitHub.
 2. Download the ZIP file for your operating system (Windows, Mac, or Linux).
 3. Unzip the folder.
@@ -77,7 +77,6 @@ cd client
 npm install
 npm run build
 ```
-*(This bundles the React code into `client/dist` so the C++ server can serve it).*
 
 **Build the Backend:**
 - **On Windows:** Run `.\build.bat`
