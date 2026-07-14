@@ -63,7 +63,14 @@ export default function SavePage() {
     finally { setRefreshing(false); }
   }, []);
 
-  useEffect(() => { Promise.resolve().then(loadChanges); }, [loadChanges]);
+  useEffect(() => { 
+    let interval: ReturnType<typeof setInterval>;
+    Promise.resolve().then(() => {
+      loadChanges();
+      interval = setInterval(loadChanges, 3000);
+    });
+    return () => clearInterval(interval);
+  }, [loadChanges]);
 
   const toggleSection = (key: SectionKey) => {
     setOpenSections(prev => {

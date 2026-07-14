@@ -20,7 +20,7 @@ It operates as a fully standalone portable desktop application. The C++ engine h
 - **Workspace & User Setup:** Configure the active project folder, set your username and email for commits, and connect a GitHub Personal Access Token to enable remote repository operations.
 - **File Staging & Commits:** View all modified, added, and deleted files in the current workspace. Select files to stage them individually and write a commit message to snapshot the changes.
 - **Branch Management:** Create new branches and switch between existing ones directly from the UI. The backend enforces a safety check to prevent checkout from overwriting local unsaved work.
-- **Commit History, Diff Viewer & Revert:** Browse the full commit timeline. Clicking any commit reveals the tracked file snapshot, and selecting a file fetches a color-coded line-by-line diff — additions in green, deletions in red. Any commit can be reverted to restore the workspace to that state.
+- **Commit History, Diff Viewer & Compare:** Browse the full commit timeline. Click "Compare Commits" to select any two points in history and see exactly what changed between them. Clicking any commit reveals the tracked file snapshot, and selecting a file fetches a color-coded line-by-line diff. Any commit can be reverted to restore the workspace to that state.
 - **GitHub Sync (Push & Pull):** Push local commits to GitHub by building blobs, trees, and commit objects via the GitHub Git Data API — without using Git. Pull remote changes by fetching the file tree and syncing blob content back to the local workspace.
 
 ---
@@ -135,3 +135,4 @@ All endpoints are served on `http://localhost:8080` when the backend is running.
 - **Conflict Resolution:** Detect and highlight merge conflicts, allowing users to manually resolve them before committing.
 - **Clone Support:** Clone an existing local or remote repository into a new directory.
 - **Stash:** Temporarily shelve local changes without committing, and restore them later.
+- **Git Ignore:** Support for a `.vcsignore` file to ignore untracked files and directories.

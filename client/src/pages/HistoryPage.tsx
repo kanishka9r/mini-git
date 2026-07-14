@@ -98,9 +98,12 @@ export default function HistoryPage() {
   }
 
   useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
     Promise.resolve().then(() => {
       loadHistory();
+      interval = setInterval(loadHistory, 3000);
     });
+    return () => clearInterval(interval);
   }, []);
 
   // Compute changed files when 2 commits are selected

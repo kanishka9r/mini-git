@@ -218,6 +218,19 @@ void ApiServer::start(int port)
     // Serve the static React frontend from client/dist
     svr.set_mount_point("/", "./client/dist");
 
+    // Serve index.html directly for the root path
+    svr.Get("/", [](const httplib::Request&, httplib::Response& res) {
+        ifstream file("./client/dist/index.html", ios::binary);
+        if (file) {
+            stringstream buffer;
+            buffer << file.rdbuf();
+            res.set_content(buffer.str(), "text/html");
+        } else {
+            res.status = 404;
+            res.set_content("<html><body><h1>404 Not Found</h1><p>Ensure you have extracted the ZIP file.</p></body></html>", "text/html");
+        }
+    });
+
     //  POST /api/workspace 
     svr.Post("/api/workspace", [](const httplib::Request& req, httplib::Response& res) {
         auto params = parseJson(req.body);
@@ -713,22 +726,8 @@ void ApiServer::start(int port)
 
             if (localContent != content)
             {
-                string currentHead = Branch::getHeadCommit();
-                string headContent = "";
-                if (!currentHead.empty())
-                {
-                    Commit headCommit = Commit::getCommit(currentHead);
-                    if (headCommit.files.find(path) != headCommit.files.end())
-                    {
-                        headContent = Storage::getObject(headCommit.files[path]);
-                    }
-                }
-
-                if (localContent != headContent)
-                {
-                    // User has edited it locally! Conflict!
-                    isConflict = true;
-                }
+                // File differs from GitHub! Conflict!
+                isConflict = true;
             }
         }
 
