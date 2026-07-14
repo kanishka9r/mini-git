@@ -232,9 +232,7 @@ void ApiServer::start(int port)
         {
             if (directoryExists(path))
             {
-                if (_chdir(path.c_str()) != 0)
-                    throw runtime_error("Unable to access workspace path");
-
+                fs::current_path(path);
                 res.set_content("{\"success\":true,\"message\":\"Workspace changed\"}", "application/json");
             }
             else
