@@ -215,6 +215,9 @@ void ApiServer::start(int port)
         res.status = 204;
     });
 
+    // Serve the static React frontend from client/dist
+    svr.set_mount_point("/", "./client/dist");
+
     //  POST /api/workspace 
     svr.Post("/api/workspace", [](const httplib::Request& req, httplib::Response& res) {
         auto params = parseJson(req.body);

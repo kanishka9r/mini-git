@@ -24,8 +24,16 @@ int main(int argc, char* argv[]) {
     //  GUI Mode no arguments  start API server + open browser 
     if (argc < 2) {
         cout << "Starting Mini-Git...\n";
-        cout << "Open http://localhost:5173 in your browser (React dev server)\n";
-        cout << "Or http://localhost:8080 for the API server\n";
+        cout << "Opening http://localhost:8080 in your browser\n";
+        
+#ifdef _WIN32
+        system("start http://localhost:8080");
+#elif __APPLE__
+        system("open http://localhost:8080");
+#else
+        system("xdg-open http://localhost:8080 &");
+#endif
+
         ApiServer::start(8080);
         return 0;
     }

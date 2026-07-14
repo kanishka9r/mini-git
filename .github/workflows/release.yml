@@ -1,0 +1,70 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*' # Trigger on version tags (e.g., v1.0.0)
+
+jobs:
+  build:
+    name: Build for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact_name: mini-git-linux
+            binary_name: vcs
+          - os: macos-latest
+            artifact_name: mini-git-mac
+            binary_name: vcs
+          - os: windows-latest
+            artifact_name: mini-git-windows
+            binary_name: vcs.exe
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Build React Frontend
+        run: |
+          cd client
+          npm install
+          npm run build
+        
+      - name: Compile C++ Backend (Linux/Mac)
+        if: matrix.os != 'windows-latest'
+        run: make
+
+      - name: Compile C++ Backend (Windows)
+        if: matrix.os == 'windows-latest'
+        run: .\build.bat
+
+      - name: Package Release
+        run: |
+          mkdir -p release/client
+          cp ${{ matrix.binary_name }} release/
+          cp -r client/dist release/client/
+        shell: bash
+
+      - name: Zip Release (Linux/Mac)
+        if: matrix.os != 'windows-latest'
+        run: |
+          cd release
+          zip -r ../${{ matrix.artifact_name }}.zip *
+
+      - name: Zip Release (Windows)
+        if: matrix.os == 'windows-latest'
+        run: Compress-Archive -Path "release\*" -DestinationPath "${{ matrix.artifact_name }}.zip"
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ matrix.artifact_name }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
