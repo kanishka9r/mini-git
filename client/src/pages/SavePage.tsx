@@ -58,7 +58,6 @@ export default function SavePage() {
     try {
       const data = await vcsClient.stagingStatus();
       setStatusData(data);
-      setSelectedFile(null); setSelectedSection(null); setDiffLines([]);
     } catch { void 0; }
     finally { setRefreshing(false); }
   }, []);
